@@ -6,6 +6,7 @@ import '../providers/search_provider.dart';
 import '../providers/audio_player_provider.dart';
 import '../providers/subsonic_provider.dart';
 import '../services/search_service.dart';
+import '../widgets/add_to_playlist_dialog.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});
@@ -261,9 +262,18 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
-      trailing: Text(
-        _formatDuration(song.duration ?? 0),
-        style: TextStyle(color: Colors.grey[600]),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            _formatDuration(song.duration ?? 0),
+            style: TextStyle(color: Colors.grey[600]),
+          ),
+          IconButton(
+            icon: const Icon(Icons.more_vert, size: 20),
+            onPressed: () => _showSongOptions(song),
+          ),
+        ],
       ),
       onTap: () {
         final audioService = ref.read(audioPlayerServiceProvider);
@@ -273,6 +283,27 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         ref.read(currentSongProvider.notifier).state = song;
         Navigator.pop(context);
       },
+    );
+  }
+
+  void _showSongOptions(Song song) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.playlist_add),
+              title: const Text('添加到播放列表'),
+              onTap: () {
+                Navigator.pop(context);
+                showAddToPlaylistDialog(context, ref, song);
+              },
+            ),
+          ],
+        ),
+      ),
     );
   }
 

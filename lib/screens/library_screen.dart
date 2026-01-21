@@ -1,10 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/playlist_provider.dart';
+import 'playlist_management_screen.dart';
+import 'playlist_detail_screen.dart';
 
-class LibraryScreen extends StatelessWidget {
+class LibraryScreen extends ConsumerStatefulWidget {
   const LibraryScreen({super.key});
 
   @override
+  ConsumerState<LibraryScreen> createState() => _LibraryScreenState();
+}
+
+class _LibraryScreenState extends ConsumerState<LibraryScreen> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => false; // 不保持状态，每次都重新构建
+
+  @override
   Widget build(BuildContext context) {
+    super.build(context); // 必须调用 super.build
+    final playlistsAsync = ref.watch(playlistsProvider);
+
     return Scaffold(
       body: CustomScrollView(
         slivers: [
@@ -21,7 +36,14 @@ class LibraryScreen extends StatelessWidget {
             actions: [
               IconButton(
                 icon: const Icon(Icons.add),
-                onPressed: () {},
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const PlaylistManagementScreen(),
+                    ),
+                  );
+                },
               ),
             ],
           ),
@@ -30,35 +52,97 @@ class LibraryScreen extends StatelessWidget {
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _buildStatCard(
-                      '歌曲',
-                      '0',
-                      Icons.music_note,
-                      Colors.blue,
+              child: playlistsAsync.when(
+                data: (playlists) => Row(
+                  children: [
+                    Expanded(
+                      child: _buildStatCard(
+                        '歌曲',
+                        '0',
+                        Icons.music_note,
+                        Colors.blue,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildStatCard(
-                      '专辑',
-                      '0',
-                      Icons.album,
-                      Colors.purple,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildStatCard(
+                        '专辑',
+                        '0',
+                        Icons.album,
+                        Colors.purple,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildStatCard(
-                      '歌单',
-                      '0',
-                      Icons.playlist_play,
-                      Colors.green,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildStatCard(
+                        '歌单',
+                        '${playlists.length}',
+                        Icons.playlist_play,
+                        Colors.green,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
+                loading: () => Row(
+                  children: [
+                    Expanded(
+                      child: _buildStatCard(
+                        '歌曲',
+                        '0',
+                        Icons.music_note,
+                        Colors.blue,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildStatCard(
+                        '专辑',
+                        '0',
+                        Icons.album,
+                        Colors.purple,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildStatCard(
+                        '歌单',
+                        '0',
+                        Icons.playlist_play,
+                        Colors.green,
+                      ),
+                    ),
+                  ],
+                ),
+                error: (_, __) => Row(
+                  children: [
+                    Expanded(
+                      child: _buildStatCard(
+                        '歌曲',
+                        '0',
+                        Icons.music_note,
+                        Colors.blue,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildStatCard(
+                        '专辑',
+                        '0',
+                        Icons.album,
+                        Colors.purple,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildStatCard(
+                        '歌单',
+                        '0',
+                        Icons.playlist_play,
+                        Colors.green,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -78,7 +162,14 @@ class LibraryScreen extends StatelessWidget {
                     ),
                   ),
                   TextButton(
-                    onPressed: () {},
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const PlaylistManagementScreen(),
+                        ),
+                      );
+                    },
                     child: const Text('管理'),
                   ),
                 ],
@@ -87,12 +178,45 @@ class LibraryScreen extends StatelessWidget {
           ),
 
           // 歌单列表
-          SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                return _buildPlaylistItem(context);
-              },
-              childCount: 5,
+          playlistsAsync.when(
+            data: (playlists) {
+              if (playlists.isEmpty) {
+                return const SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.all(32),
+                    child: Center(
+                      child: Text(
+                        '还没有歌单',
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    ),
+                  ),
+                );
+              }
+
+              return SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final playlist = playlists[index];
+                    return _buildPlaylistItem(context, playlist);
+                  },
+                  childCount: playlists.length > 5 ? 5 : playlists.length,
+                ),
+              );
+            },
+            loading: () => const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.all(32),
+                child: Center(child: CircularProgressIndicator()),
+              ),
+            ),
+            error: (error, stack) => SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Center(
+                  child: Text('加载失败: $error'),
+                ),
+              ),
             ),
           ),
 
@@ -130,7 +254,7 @@ class LibraryScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildPlaylistItem(BuildContext context) {
+  Widget _buildPlaylistItem(BuildContext context, playlist) {
     return ListTile(
       leading: Container(
         width: 56,
@@ -141,16 +265,23 @@ class LibraryScreen extends StatelessWidget {
         ),
         child: const Icon(Icons.playlist_play, color: Colors.grey),
       ),
-      title: const Text(
-        '我喜欢的音乐',
-        style: TextStyle(fontWeight: FontWeight.w600),
+      title: Text(
+        playlist.name,
+        style: const TextStyle(fontWeight: FontWeight.w600),
       ),
-      subtitle: const Text('0 首歌曲'),
+      subtitle: Text('${playlist.songIds.length} 首歌曲'),
       trailing: IconButton(
         icon: const Icon(Icons.more_vert),
         onPressed: () {},
       ),
-      onTap: () {},
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PlaylistDetailScreen(playlistId: playlist.id),
+          ),
+        );
+      },
     );
   }
 }

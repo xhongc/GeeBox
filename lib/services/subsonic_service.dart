@@ -195,4 +195,199 @@ class SubsonicService {
       return {'songs': [], 'albums': []};
     }
   }
+
+  // ==================== 播放列表相关 API ====================
+
+  /// 获取所有播放列表
+  Future<List<Map<String, dynamic>>> getPlaylists() async {
+    try {
+      final params = _getAuthParams();
+
+      final response = await _dio.get(
+        '$_serverUrl/rest/getPlaylists',
+        queryParameters: params,
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data['subsonic-response'];
+        if (data['status'] == 'ok' && data['playlists'] != null) {
+          final playlists = data['playlists']['playlist'];
+          if (playlists is List) {
+            return playlists.cast<Map<String, dynamic>>();
+          } else if (playlists is Map) {
+            return [playlists.cast<String, dynamic>()];
+          }
+        }
+      }
+      return [];
+    } catch (e) {
+      print('Get playlists error: $e');
+      return [];
+    }
+  }
+
+  /// 获取播放列表详情（包含歌曲）
+  Future<Map<String, dynamic>?> getPlaylist(String playlistId) async {
+    try {
+      final params = _getAuthParams();
+      params['id'] = playlistId;
+
+      final response = await _dio.get(
+        '$_serverUrl/rest/getPlaylist',
+        queryParameters: params,
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data['subsonic-response'];
+        if (data['status'] == 'ok' && data['playlist'] != null) {
+          return data['playlist'];
+        }
+      }
+      return null;
+    } catch (e) {
+      print('Get playlist error: $e');
+      return null;
+    }
+  }
+
+  /// 创建播放列表
+  Future<String?> createPlaylist({
+    required String name,
+    String? comment,
+  }) async {
+    try {
+      final params = _getAuthParams();
+      params['name'] = name;
+      if (comment != null && comment.isNotEmpty) {
+        params['comment'] = comment;
+      }
+
+      final response = await _dio.get(
+        '$_serverUrl/rest/createPlaylist',
+        queryParameters: params,
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data['subsonic-response'];
+        if (data['status'] == 'ok') {
+          // 1.14.0+ 版本会返回创建的播放列表
+          if (data['playlist'] != null) {
+            return data['playlist']['id'];
+          }
+          // 早期版本需要重新获取播放列表列表来找到新创建的
+          return null;
+        }
+      }
+      return null;
+    } catch (e) {
+      print('Create playlist error: $e');
+      return null;
+    }
+  }
+
+  /// 更新播放列表（修改名称和描述）
+  Future<bool> updatePlaylistInfo({
+    required String playlistId,
+    String? name,
+    String? comment,
+  }) async {
+    try {
+      final params = _getAuthParams();
+      params['playlistId'] = playlistId;
+      if (name != null) {
+        params['name'] = name;
+      }
+      if (comment != null) {
+        params['comment'] = comment;
+      }
+
+      final response = await _dio.get(
+        '$_serverUrl/rest/updatePlaylist',
+        queryParameters: params,
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data['subsonic-response'];
+        return data['status'] == 'ok';
+      }
+      return false;
+    } catch (e) {
+      print('Update playlist info error: $e');
+      return false;
+    }
+  }
+
+  /// 添加歌曲到播放列表
+  Future<bool> addSongToPlaylist({
+    required String playlistId,
+    required String songId,
+  }) async {
+    try {
+      final params = _getAuthParams();
+      params['playlistId'] = playlistId;
+      params['songIdToAdd'] = songId;
+
+      final response = await _dio.get(
+        '$_serverUrl/rest/updatePlaylist',
+        queryParameters: params,
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data['subsonic-response'];
+        return data['status'] == 'ok';
+      }
+      return false;
+    } catch (e) {
+      print('Add song to playlist error: $e');
+      return false;
+    }
+  }
+
+  /// 从播放列表移除歌曲（通过索引）
+  Future<bool> removeSongFromPlaylist({
+    required String playlistId,
+    required int songIndex,
+  }) async {
+    try {
+      final params = _getAuthParams();
+      params['playlistId'] = playlistId;
+      params['songIndexToRemove'] = songIndex.toString();
+
+      final response = await _dio.get(
+        '$_serverUrl/rest/updatePlaylist',
+        queryParameters: params,
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data['subsonic-response'];
+        return data['status'] == 'ok';
+      }
+      return false;
+    } catch (e) {
+      print('Remove song from playlist error: $e');
+      return false;
+    }
+  }
+
+  /// 删除播放列表
+  Future<bool> deletePlaylist(String playlistId) async {
+    try {
+      final params = _getAuthParams();
+      params['id'] = playlistId;
+
+      final response = await _dio.get(
+        '$_serverUrl/rest/deletePlaylist',
+        queryParameters: params,
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data['subsonic-response'];
+        return data['status'] == 'ok';
+      }
+      return false;
+    } catch (e) {
+      print('Delete playlist error: $e');
+      return false;
+    }
+  }
 }

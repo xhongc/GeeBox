@@ -29,8 +29,8 @@ final durationProvider = StreamProvider<Duration?>((ref) {
   return service.durationStream;
 });
 
-// 播放列表 Provider
-final playlistProvider = StateProvider<List<Song>>((ref) => []);
+// 当前播放队列 Provider
+final currentPlaylistProvider = StateProvider<List<Song>>((ref) => []);
 
 // 当前播放索引 Provider
 final currentIndexProvider = StateProvider<int>((ref) => -1);

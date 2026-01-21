@@ -5,6 +5,7 @@ import 'router/app_router.dart';
 import 'models/song.dart';
 import 'models/album.dart';
 import 'models/search_history.dart';
+import 'models/playlist.dart';
 import 'providers/theme_provider.dart';
 import 'theme/app_theme.dart';
 
@@ -18,11 +19,13 @@ void main() async {
   Hive.registerAdapter(SongAdapter());
   Hive.registerAdapter(AlbumAdapter());
   Hive.registerAdapter(SearchHistoryAdapter());
+  Hive.registerAdapter(PlaylistAdapter());
 
   // 打开 Hive boxes
   await Hive.openBox<Song>('songs');
   await Hive.openBox<Album>('albums');
   await Hive.openBox<SearchHistory>('search_history');
+  await Hive.openBox<Playlist>('playlists');
   await Hive.openBox('settings');
 
   runApp(const ProviderScope(child: MyApp()));
