@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'artists_screen.dart';
 
 class BrowseScreen extends StatelessWidget {
   const BrowseScreen({super.key});
@@ -34,7 +35,12 @@ class BrowseScreen extends StatelessWidget {
             title: '艺术家',
             subtitle: '浏览所有艺术家',
             onTap: () {
-              // TODO: 导航到艺术家列表
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ArtistsScreen(),
+                ),
+              );
             },
           ),
           const SizedBox(height: 12),

@@ -4,6 +4,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'router/app_router.dart';
 import 'models/song.dart';
 import 'models/album.dart';
+import 'models/artist.dart';
 import 'models/search_history.dart';
 import 'models/playlist.dart';
 import 'providers/theme_provider.dart';
@@ -18,12 +19,14 @@ void main() async {
   // 注册 Hive 适配器
   Hive.registerAdapter(SongAdapter());
   Hive.registerAdapter(AlbumAdapter());
+  Hive.registerAdapter(ArtistAdapter());
   Hive.registerAdapter(SearchHistoryAdapter());
   Hive.registerAdapter(PlaylistAdapter());
 
   // 打开 Hive boxes
   await Hive.openBox<Song>('songs');
   await Hive.openBox<Album>('albums');
+  await Hive.openBox<Artist>('artists');
   await Hive.openBox<SearchHistory>('search_history');
   await Hive.openBox<Playlist>('playlists');
   await Hive.openBox('settings');

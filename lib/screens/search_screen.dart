@@ -7,6 +7,7 @@ import '../providers/audio_player_provider.dart';
 import '../providers/subsonic_provider.dart';
 import '../services/search_service.dart';
 import '../widgets/add_to_playlist_dialog.dart';
+import 'album_detail_screen.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});
@@ -69,7 +70,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           controller: _searchController,
           autofocus: true,
           decoration: InputDecoration(
-            hintText: '搜索歌曲、专辑...',
+            hintText: '搜索歌曲、专辑、艺术家...',
             border: InputBorder.none,
             suffixIcon: _searchController.text.isNotEmpty
                 ? IconButton(
@@ -333,9 +334,16 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         style: TextStyle(color: Colors.grey[600]),
       ),
       onTap: () {
-        // TODO: 导航到专辑详情页
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('打开专辑: ${album.name}')),
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => AlbumDetailScreen(
+              albumId: album.id,
+              albumName: album.name,
+              albumArtist: album.artist,
+              coverArtId: album.coverArt,
+            ),
+          ),
         );
       },
     );

@@ -1,8 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/playlist_provider.dart';
+import '../providers/music_repository_provider.dart';
 import 'playlist_management_screen.dart';
 import 'playlist_detail_screen.dart';
+
+// 音乐库统计 Provider
+final libraryStatsProvider = FutureProvider.autoDispose<Map<String, int>>((ref) async {
+  final repository = ref.watch(musicRepositoryProvider);
+  return await repository.getLibraryStats();
+});
 
 class LibraryScreen extends ConsumerStatefulWidget {
   const LibraryScreen({super.key});
@@ -19,6 +26,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with AutomaticKee
   Widget build(BuildContext context) {
     super.build(context); // 必须调用 super.build
     final playlistsAsync = ref.watch(playlistsProvider);
+    final statsAsync = ref.watch(libraryStatsProvider);
 
     return Scaffold(
       body: CustomScrollView(
@@ -52,13 +60,13 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with AutomaticKee
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: playlistsAsync.when(
-                data: (playlists) => Row(
+              child: statsAsync.when(
+                data: (stats) => Row(
                   children: [
                     Expanded(
                       child: _buildStatCard(
                         '歌曲',
-                        '0',
+                        '${stats['songs'] ?? 0}',
                         Icons.music_note,
                         Colors.blue,
                       ),
@@ -67,18 +75,32 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with AutomaticKee
                     Expanded(
                       child: _buildStatCard(
                         '专辑',
-                        '0',
+                        '${stats['albums'] ?? 0}',
                         Icons.album,
                         Colors.purple,
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: _buildStatCard(
-                        '歌单',
-                        '${playlists.length}',
-                        Icons.playlist_play,
-                        Colors.green,
+                      child: playlistsAsync.when(
+                        data: (playlists) => _buildStatCard(
+                          '歌单',
+                          '${playlists.length}',
+                          Icons.playlist_play,
+                          Colors.green,
+                        ),
+                        loading: () => _buildStatCard(
+                          '歌单',
+                          '0',
+                          Icons.playlist_play,
+                          Colors.green,
+                        ),
+                        error: (_, __) => _buildStatCard(
+                          '歌单',
+                          '0',
+                          Icons.playlist_play,
+                          Colors.green,
+                        ),
                       ),
                     ),
                   ],
@@ -88,7 +110,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with AutomaticKee
                     Expanded(
                       child: _buildStatCard(
                         '歌曲',
-                        '0',
+                        '...',
                         Icons.music_note,
                         Colors.blue,
                       ),
@@ -97,7 +119,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with AutomaticKee
                     Expanded(
                       child: _buildStatCard(
                         '专辑',
-                        '0',
+                        '...',
                         Icons.album,
                         Colors.purple,
                       ),
@@ -106,7 +128,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with AutomaticKee
                     Expanded(
                       child: _buildStatCard(
                         '歌单',
-                        '0',
+                        '...',
                         Icons.playlist_play,
                         Colors.green,
                       ),

@@ -3,6 +3,7 @@ import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import '../models/song.dart';
 import '../models/album.dart';
+import '../models/artist.dart';
 
 class SubsonicService {
   final Dio _dio;
@@ -388,6 +389,70 @@ class SubsonicService {
     } catch (e) {
       print('Delete playlist error: $e');
       return false;
+    }
+  }
+
+  // ==================== 艺术家相关 API ====================
+
+  /// 获取所有艺术家（按字母索引）
+  Future<List<Artist>> getArtists() async {
+    try {
+      final params = _getAuthParams();
+
+      final response = await _dio.get(
+        '$_serverUrl/rest/getArtists',
+        queryParameters: params,
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data['subsonic-response'];
+        if (data['status'] == 'ok' && data['artists'] != null) {
+          final artists = <Artist>[];
+          final indexes = data['artists']['index'];
+
+          if (indexes is List) {
+            for (final index in indexes) {
+              if (index['artist'] != null) {
+                final artistList = index['artist'];
+                if (artistList is List) {
+                  artists.addAll(artistList.map((json) => Artist.fromJson(json)));
+                } else if (artistList is Map) {
+                  artists.add(Artist.fromJson(artistList.cast<String, dynamic>()));
+                }
+              }
+            }
+          }
+          return artists;
+        }
+      }
+      return [];
+    } catch (e) {
+      print('Get artists error: $e');
+      return [];
+    }
+  }
+
+  /// 获取艺术家详情（包含专辑列表）
+  Future<Map<String, dynamic>?> getArtist(String artistId) async {
+    try {
+      final params = _getAuthParams();
+      params['id'] = artistId;
+
+      final response = await _dio.get(
+        '$_serverUrl/rest/getArtist',
+        queryParameters: params,
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data['subsonic-response'];
+        if (data['status'] == 'ok' && data['artist'] != null) {
+          return data['artist'];
+        }
+      }
+      return null;
+    } catch (e) {
+      print('Get artist error: $e');
+      return null;
     }
   }
 }

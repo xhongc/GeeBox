@@ -1,12 +1,35 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/music_repository_provider.dart';
+import '../models/album.dart';
+import 'search_screen.dart';
+import 'album_detail_screen.dart';
+import 'artists_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // 页面加载时获取数据
+    Future.microtask(() {
+      ref.read(recentAlbumsProvider);
+      ref.read(randomAlbumsProvider);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final recentAlbumsAsync = ref.watch(recentAlbumsProvider);
+    final randomAlbumsAsync = ref.watch(randomAlbumsProvider);
 
     return Scaffold(
       body: CustomScrollView(
@@ -26,13 +49,12 @@ class HomeScreen extends StatelessWidget {
               IconButton(
                 icon: const Icon(Icons.search),
                 onPressed: () {
-                  // TODO: 实现搜索功能
-                },
-              ),
-              IconButton(
-                icon: const Icon(Icons.notifications_outlined),
-                onPressed: () {
-                  // TODO: 实现通知功能
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const SearchScreen(),
+                    ),
+                  );
                 },
               ),
             ],
@@ -77,27 +99,38 @@ class HomeScreen extends StatelessWidget {
                     children: [
                       _buildQuickAccessCard(
                         context,
+                        '艺术家',
+                        Icons.person,
+                        Colors.orange,
+                        () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const ArtistsScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                      _buildQuickAccessCard(
+                        context,
                         '我喜欢的音乐',
                         Icons.favorite,
                         Colors.purple,
+                        () {},
                       ),
                       _buildQuickAccessCard(
                         context,
                         '最近播放',
                         Icons.history,
                         Colors.green,
-                      ),
-                      _buildQuickAccessCard(
-                        context,
-                        '本地音乐',
-                        Icons.phone_android,
-                        Colors.blue,
+                        () {},
                       ),
                       _buildQuickAccessCard(
                         context,
                         '下载管理',
                         Icons.download,
-                        Colors.orange,
+                        Colors.blue,
+                        () {},
                       ),
                     ],
                   ),
@@ -108,7 +141,7 @@ class HomeScreen extends StatelessWidget {
 
           const SliverToBoxAdapter(child: SizedBox(height: 32)),
 
-          // 最近播放
+          // 最近专辑
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -116,38 +149,71 @@ class HomeScreen extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
-                    '最近播放',
+                    '最近专辑',
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   TextButton(
-                    onPressed: () {},
-                    child: const Text('查看全部'),
+                    onPressed: () {
+                      ref.invalidate(recentAlbumsProvider);
+                    },
+                    child: const Text('刷新'),
                   ),
                 ],
               ),
             ),
           ),
 
-          SliverToBoxAdapter(
-            child: SizedBox(
-              height: 210,
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                scrollDirection: Axis.horizontal,
-                itemCount: 5,
-                itemBuilder: (context, index) {
-                  return _buildAlbumCard(context, index);
-                },
+          recentAlbumsAsync.when(
+            data: (albums) {
+              if (albums.isEmpty) {
+                return const SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.all(32),
+                    child: Center(
+                      child: Text(
+                        '暂无数据',
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    ),
+                  ),
+                );
+              }
+              return SliverToBoxAdapter(
+                child: SizedBox(
+                  height: 210,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    scrollDirection: Axis.horizontal,
+                    itemCount: albums.length,
+                    itemBuilder: (context, index) {
+                      return _buildAlbumCard(context, albums[index]);
+                    },
+                  ),
+                ),
+              );
+            },
+            loading: () => const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.all(32),
+                child: Center(child: CircularProgressIndicator()),
+              ),
+            ),
+            error: (error, stack) => SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Center(
+                  child: Text('加载失败: $error'),
+                ),
               ),
             ),
           ),
 
           const SliverToBoxAdapter(child: SizedBox(height: 32)),
 
-          // 热门音乐
+          // 随机推荐
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -155,31 +221,64 @@ class HomeScreen extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
-                    '热门音乐',
+                    '随机推荐',
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   TextButton(
-                    onPressed: () {},
-                    child: const Text('查看全部'),
+                    onPressed: () {
+                      ref.invalidate(randomAlbumsProvider);
+                    },
+                    child: const Text('换一批'),
                   ),
                 ],
               ),
             ),
           ),
 
-          SliverToBoxAdapter(
-            child: SizedBox(
-              height: 210,
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                scrollDirection: Axis.horizontal,
-                itemCount: 5,
-                itemBuilder: (context, index) {
-                  return _buildAlbumCard(context, index);
-                },
+          randomAlbumsAsync.when(
+            data: (albums) {
+              if (albums.isEmpty) {
+                return const SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.all(32),
+                    child: Center(
+                      child: Text(
+                        '暂无数据',
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    ),
+                  ),
+                );
+              }
+              return SliverToBoxAdapter(
+                child: SizedBox(
+                  height: 210,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    scrollDirection: Axis.horizontal,
+                    itemCount: albums.length,
+                    itemBuilder: (context, index) {
+                      return _buildAlbumCard(context, albums[index]);
+                    },
+                  ),
+                ),
+              );
+            },
+            loading: () => const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.all(32),
+                child: Center(child: CircularProgressIndicator()),
+              ),
+            ),
+            error: (error, stack) => SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Center(
+                  child: Text('加载失败: $error'),
+                ),
               ),
             ),
           ),
@@ -243,49 +342,86 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildAlbumCard(BuildContext context, int index) {
+  Widget _buildAlbumCard(BuildContext context, Album album) {
+    final repository = ref.read(musicRepositoryProvider);
+
     return Container(
       width: 160,
       margin: const EdgeInsets.only(right: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 封面
-          Container(
-            width: 160,
-            height: 160,
-            decoration: BoxDecoration(
-              color: Colors.grey[300],
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => AlbumDetailScreen(
+                albumId: album.id,
+                albumName: album.name,
+                albumArtist: album.artist,
+                coverArtId: album.coverArt,
+              ),
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 封面
+            ClipRRect(
               borderRadius: BorderRadius.circular(8),
+              child: album.coverArt != null
+                  ? Image.network(
+                      repository.getCoverArtUrl(album.coverArt!),
+                      width: 160,
+                      height: 160,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          width: 160,
+                          height: 160,
+                          color: Colors.grey[300],
+                          child: const Icon(
+                            Icons.album,
+                            size: 64,
+                            color: Colors.grey,
+                          ),
+                        );
+                      },
+                    )
+                  : Container(
+                      width: 160,
+                      height: 160,
+                      color: Colors.grey[300],
+                      child: const Icon(
+                        Icons.album,
+                        size: 64,
+                        color: Colors.grey,
+                      ),
+                    ),
             ),
-            child: const Icon(
-              Icons.album,
-              size: 64,
-              color: Colors.grey,
+            const SizedBox(height: 8),
+            // 标题
+            Text(
+              album.name,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-          ),
-          const SizedBox(height: 8),
-          // 标题
-          const Text(
-            '专辑名称',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
+            // 艺术家
+            Text(
+              album.artist ?? '未知艺术家',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[600],
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          // 艺术家
-          Text(
-            '艺术家',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[600],
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
