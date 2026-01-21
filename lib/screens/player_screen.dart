@@ -4,13 +4,31 @@ import 'dart:ui';
 import '../providers/audio_player_provider.dart';
 import '../providers/subsonic_provider.dart';
 import '../providers/music_repository_provider.dart';
+import '../providers/favorite_provider.dart';
+import '../providers/play_history_provider.dart';
 import '../services/audio_player_service.dart';
 
-class PlayerScreen extends ConsumerWidget {
+class PlayerScreen extends ConsumerStatefulWidget {
   const PlayerScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<PlayerScreen> createState() => _PlayerScreenState();
+}
+
+class _PlayerScreenState extends ConsumerState<PlayerScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // 设置 scrobble 回调
+    final audioService = ref.read(audioPlayerServiceProvider);
+    final playHistoryService = ref.read(playHistoryServiceProvider);
+    audioService.setScrobbleCallback((songId) {
+      playHistoryService.scrobble(songId);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final currentSong = ref.watch(currentSongProvider);
@@ -180,10 +198,47 @@ class PlayerScreen extends ConsumerWidget {
                             ],
                           ),
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.favorite_border),
-                          iconSize: 28,
-                          onPressed: () {},
+                        // 收藏按钮
+                        Consumer(
+                          builder: (context, ref, child) {
+                            final isStarred = ref.watch(isSongStarredProvider(currentSong.id));
+
+                            return isStarred.when(
+                              data: (starred) => IconButton(
+                                icon: Icon(
+                                  starred ? Icons.favorite : Icons.favorite_border,
+                                  color: starred ? Colors.red : null,
+                                ),
+                                iconSize: 28,
+                                onPressed: () async {
+                                  final service = ref.read(favoriteServiceProvider);
+                                  if (starred) {
+                                    await service.unstarSong(currentSong.id);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('已取消收藏')),
+                                    );
+                                  } else {
+                                    await service.starSong(currentSong.id);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('已添加到我喜欢的音乐')),
+                                    );
+                                  }
+                                  // 刷新收藏状态
+                                  ref.invalidate(starredSongsProvider);
+                                },
+                              ),
+                              loading: () => const SizedBox(
+                                width: 28,
+                                height: 28,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                              error: (_, __) => IconButton(
+                                icon: const Icon(Icons.favorite_border),
+                                iconSize: 28,
+                                onPressed: () {},
+                              ),
+                            );
+                          },
                         ),
                       ],
                     ),

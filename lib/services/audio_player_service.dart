@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:just_audio/just_audio.dart';
 import '../models/song.dart';
 
@@ -18,6 +19,11 @@ class AudioPlayerService {
   int _currentIndex = -1;
   PlayMode _playMode = PlayMode.sequence;
 
+  // Scrobble 相关
+  bool _hasScrobbled = false;
+  StreamSubscription? _positionSubscription;
+  Function(String)? _onScrobble;
+
   // Getters
   AudioPlayer get player => _player;
   List<Song> get playlist => _playlist;
@@ -31,6 +37,11 @@ class AudioPlayerService {
   Stream<PlayerState> get playerStateStream => _player.playerStateStream;
   Stream<Duration> get positionStream => _player.positionStream;
   Stream<Duration?> get durationStream => _player.durationStream;
+
+  /// 设置 scrobble 回调函数
+  void setScrobbleCallback(Function(String) callback) {
+    _onScrobble = callback;
+  }
 
   /// 设置播放模式
   void setPlayMode(PlayMode mode) {
@@ -77,8 +88,22 @@ class AudioPlayerService {
   /// 播放指定歌曲
   Future<void> playSong(Song song, String streamUrl) async {
     try {
+      // 重置 scrobble 标记
+      _hasScrobbled = false;
+
+      // 取消之前的监听
+      _positionSubscription?.cancel();
+
       await _player.setUrl(streamUrl);
       await _player.play();
+
+      // 监听播放进度，30秒后提交 scrobble
+      _positionSubscription = _player.positionStream.listen((position) {
+        if (position.inSeconds >= 30 && !_hasScrobbled && _onScrobble != null) {
+          _onScrobble!(song.id);
+          _hasScrobbled = true;
+        }
+      });
     } catch (e) {
       print('Play song error: $e');
     }
@@ -129,6 +154,7 @@ class AudioPlayerService {
 
   /// 释放资源
   Future<void> dispose() async {
+    _positionSubscription?.cancel();
     await _player.dispose();
   }
 }

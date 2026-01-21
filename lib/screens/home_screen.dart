@@ -5,6 +5,8 @@ import '../models/album.dart';
 import 'search_screen.dart';
 import 'album_detail_screen.dart';
 import 'artists_screen.dart';
+import 'favorites_screen.dart';
+import 'play_history_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -116,14 +118,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         '我喜欢的音乐',
                         Icons.favorite,
                         Colors.purple,
-                        () {},
+                        () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const FavoritesScreen(),
+                            ),
+                          );
+                        },
                       ),
                       _buildQuickAccessCard(
                         context,
                         '最近播放',
                         Icons.history,
                         Colors.green,
-                        () {},
+                        () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const PlayHistoryScreen(),
+                            ),
+                          );
+                        },
                       ),
                       _buildQuickAccessCard(
                         context,

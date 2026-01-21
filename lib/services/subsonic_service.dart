@@ -455,4 +455,133 @@ class SubsonicService {
       return null;
     }
   }
+
+  /// 收藏歌曲/专辑/艺术家
+  Future<bool> star({String? id, String? albumId, String? artistId}) async {
+    try {
+      final params = _getAuthParams();
+      if (id != null) params['id'] = id;
+      if (albumId != null) params['albumId'] = albumId;
+      if (artistId != null) params['artistId'] = artistId;
+
+      final response = await _dio.get(
+        '$_serverUrl/rest/star',
+        queryParameters: params,
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data['subsonic-response'];
+        return data['status'] == 'ok';
+      }
+      return false;
+    } catch (e) {
+      print('Star error: $e');
+      return false;
+    }
+  }
+
+  /// 取消收藏歌曲/专辑/艺术家
+  Future<bool> unstar({String? id, String? albumId, String? artistId}) async {
+    try {
+      final params = _getAuthParams();
+      if (id != null) params['id'] = id;
+      if (albumId != null) params['albumId'] = albumId;
+      if (artistId != null) params['artistId'] = artistId;
+
+      final response = await _dio.get(
+        '$_serverUrl/rest/unstar',
+        queryParameters: params,
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data['subsonic-response'];
+        return data['status'] == 'ok';
+      }
+      return false;
+    } catch (e) {
+      print('Unstar error: $e');
+      return false;
+    }
+  }
+
+  /// 获取收藏列表
+  Future<List<Song>> getStarredSongs() async {
+    try {
+      final response = await _dio.get(
+        '$_serverUrl/rest/getStarred',
+        queryParameters: _getAuthParams(),
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data['subsonic-response'];
+        if (data['status'] == 'ok' && data['starred'] != null) {
+          final songs = data['starred']['song'] as List?;
+          if (songs != null) {
+            return songs.map((json) => Song.fromJson(json)).toList();
+          }
+        }
+      }
+      return [];
+    } catch (e) {
+      print('Get starred songs error: $e');
+      return [];
+    }
+  }
+
+  /// 提交播放记录（scrobble）
+  Future<bool> scrobble(String id, {int? time, bool submission = true}) async {
+    try {
+      final params = _getAuthParams();
+      params['id'] = id;
+      if (time != null) params['time'] = time.toString();
+      params['submission'] = submission.toString();
+
+      final response = await _dio.get(
+        '$_serverUrl/rest/scrobble',
+        queryParameters: params,
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data['subsonic-response'];
+        return data['status'] == 'ok';
+      }
+      return false;
+    } catch (e) {
+      print('Scrobble error: $e');
+      return false;
+    }
+  }
+
+  /// 按类型获取歌曲（用于获取播放历史）
+  Future<List<Song>> getSongsByGenre(
+    String genre, {
+    int count = 10,
+    int offset = 0,
+  }) async {
+    try {
+      final params = _getAuthParams();
+      params['genre'] = genre;
+      params['count'] = count.toString();
+      params['offset'] = offset.toString();
+
+      final response = await _dio.get(
+        '$_serverUrl/rest/getSongsByGenre',
+        queryParameters: params,
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data['subsonic-response'];
+        if (data['status'] == 'ok' && data['songsByGenre'] != null) {
+          final songs = data['songsByGenre']['song'] as List?;
+          if (songs != null) {
+            return songs.map((json) => Song.fromJson(json)).toList();
+          }
+        }
+      }
+      return [];
+    } catch (e) {
+      print('Get songs by genre error: $e');
+      return [];
+    }
+  }
 }
