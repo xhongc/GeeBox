@@ -57,6 +57,12 @@ dependencies:
   hive_flutter: ^1.1.0
   path_provider: ^2.1.5
 
+  # 图片缓存
+  cached_network_image: ^3.3.0
+
+  # 共享偏好设置
+  shared_preferences: ^2.2.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
