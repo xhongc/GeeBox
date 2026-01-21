@@ -1,22 +1,50 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:ui';
+import '../providers/audio_player_provider.dart';
+import '../providers/subsonic_provider.dart';
+import '../providers/music_repository_provider.dart';
+import '../services/audio_player_service.dart';
 
-class PlayerScreen extends StatefulWidget {
+class PlayerScreen extends ConsumerWidget {
   const PlayerScreen({super.key});
 
   @override
-  State<PlayerScreen> createState() => _PlayerScreenState();
-}
-
-class _PlayerScreenState extends State<PlayerScreen> {
-  bool _isPlaying = false;
-  double _currentPosition = 0.3;
-
-  @override
-  Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final currentSong = ref.watch(currentSongProvider);
+    final playerState = ref.watch(playerStateProvider);
+    final position = ref.watch(positionProvider);
+    final duration = ref.watch(durationProvider);
+    final audioService = ref.watch(audioPlayerServiceProvider);
+    final subsonicService = ref.watch(subsonicServiceProvider);
+    final repository = ref.watch(musicRepositoryProvider);
+
+    // 如果没有歌曲，返回空页面
+    if (currentSong == null) {
+      return Scaffold(
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.keyboard_arrow_down, size: 32),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
+        body: const Center(
+          child: Text('暂无播放内容'),
+        ),
+      );
+    }
+
+    final isPlaying = playerState.value?.playing ?? false;
+    final currentPosition = position.value ?? Duration.zero;
+    final totalDuration = duration.value ?? Duration.zero;
+    final progress = totalDuration.inSeconds > 0
+        ? currentPosition.inSeconds / totalDuration.inSeconds
+        : 0.0;
+    final playMode = ref.watch(playModeProvider);
 
     // 模拟专辑颜色
     final albumColor = colorScheme.primary;
@@ -74,17 +102,36 @@ class _PlayerScreenState extends State<PlayerScreen> {
                       borderRadius: BorderRadius.circular(16),
                       child: Stack(
                         children: [
-                          // 封面图片占位符
-                          Container(
-                            color: Colors.grey[800],
-                            child: const Center(
-                              child: Icon(
-                                Icons.music_note,
-                                size: 120,
-                                color: Colors.white54,
-                              ),
-                            ),
-                          ),
+                          // 封面图片
+                          currentSong.coverArt != null
+                              ? Image.network(
+                                  repository.getCoverArtUrl(currentSong.coverArt!),
+                                  fit: BoxFit.cover,
+                                  width: double.infinity,
+                                  height: double.infinity,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Container(
+                                      color: Colors.grey[800],
+                                      child: const Center(
+                                        child: Icon(
+                                          Icons.music_note,
+                                          size: 120,
+                                          color: Colors.white54,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                )
+                              : Container(
+                                  color: Colors.grey[800],
+                                  child: const Center(
+                                    child: Icon(
+                                      Icons.music_note,
+                                      size: 120,
+                                      color: Colors.white54,
+                                    ),
+                                  ),
+                                ),
                           // 毛玻璃效果（可选）
                           BackdropFilter(
                             filter: ImageFilter.blur(sigmaX: 0, sigmaY: 0),
@@ -114,7 +161,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                '歌曲名称',
+                                currentSong.title,
                                 style: theme.textTheme.headlineSmall?.copyWith(
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -123,7 +170,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                '艺术家',
+                                currentSong.artist ?? '未知艺术家',
                                 style: theme.textTheme.bodyLarge?.copyWith(
                                   color: Colors.grey[400],
                                 ),
@@ -162,11 +209,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
                         ),
                       ),
                       child: Slider(
-                        value: _currentPosition,
+                        value: progress.clamp(0.0, 1.0),
                         onChanged: (value) {
-                          setState(() {
-                            _currentPosition = value;
-                          });
+                          final newPosition = Duration(
+                            seconds: (value * totalDuration.inSeconds).toInt(),
+                          );
+                          audioService.seek(newPosition);
                         },
                       ),
                     ),
@@ -176,17 +224,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            _formatDuration(
-                              Duration(
-                                seconds: (_currentPosition * 240).toInt(),
-                              ),
-                            ),
+                            _formatDuration(currentPosition),
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: Colors.grey[400],
                             ),
                           ),
                           Text(
-                            '4:00',
+                            _formatDuration(totalDuration),
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: Colors.grey[400],
                             ),
@@ -207,14 +251,31 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.shuffle),
+                      icon: Icon(
+                        playMode == PlayMode.shuffle
+                            ? Icons.shuffle_on_outlined
+                            : Icons.shuffle,
+                        color: playMode == PlayMode.shuffle
+                            ? colorScheme.primary
+                            : null,
+                      ),
                       iconSize: 28,
-                      onPressed: () {},
+                      onPressed: () {
+                        if (playMode == PlayMode.shuffle) {
+                          audioService.setPlayMode(PlayMode.sequence);
+                          ref.read(playModeProvider.notifier).state = PlayMode.sequence;
+                        } else {
+                          audioService.setPlayMode(PlayMode.shuffle);
+                          ref.read(playModeProvider.notifier).state = PlayMode.shuffle;
+                        }
+                      },
                     ),
                     IconButton(
                       icon: const Icon(Icons.skip_previous),
                       iconSize: 40,
-                      onPressed: () {},
+                      onPressed: () {
+                        audioService.previous((id) => subsonicService.getStreamUrl(id));
+                      },
                     ),
                     Container(
                       width: 72,
@@ -232,26 +293,41 @@ class _PlayerScreenState extends State<PlayerScreen> {
                       ),
                       child: IconButton(
                         icon: Icon(
-                          _isPlaying ? Icons.pause : Icons.play_arrow,
+                          isPlaying ? Icons.pause : Icons.play_arrow,
                           size: 36,
                         ),
                         color: Colors.white,
                         onPressed: () {
-                          setState(() {
-                            _isPlaying = !_isPlaying;
-                          });
+                          audioService.playPause();
                         },
                       ),
                     ),
                     IconButton(
                       icon: const Icon(Icons.skip_next),
                       iconSize: 40,
-                      onPressed: () {},
+                      onPressed: () {
+                        audioService.next((id) => subsonicService.getStreamUrl(id));
+                      },
                     ),
                     IconButton(
-                      icon: const Icon(Icons.repeat),
+                      icon: Icon(
+                        playMode == PlayMode.repeatOne
+                            ? Icons.repeat_one
+                            : Icons.repeat,
+                        color: playMode == PlayMode.repeatOne
+                            ? colorScheme.primary
+                            : null,
+                      ),
                       iconSize: 28,
-                      onPressed: () {},
+                      onPressed: () {
+                        if (playMode == PlayMode.repeatOne) {
+                          audioService.setPlayMode(PlayMode.sequence);
+                          ref.read(playModeProvider.notifier).state = PlayMode.sequence;
+                        } else {
+                          audioService.setPlayMode(PlayMode.repeatOne);
+                          ref.read(playModeProvider.notifier).state = PlayMode.repeatOne;
+                        }
+                      },
                     ),
                   ],
                 ),

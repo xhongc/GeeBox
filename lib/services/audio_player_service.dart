@@ -1,6 +1,13 @@
 import 'package:just_audio/just_audio.dart';
 import '../models/song.dart';
 
+/// 播放模式枚举
+enum PlayMode {
+  sequence,  // 顺序播放
+  shuffle,   // 随机播放
+  repeatOne, // 单曲循环
+}
+
 class AudioPlayerService {
   static final AudioPlayerService _instance = AudioPlayerService._internal();
   factory AudioPlayerService() => _instance;
@@ -9,11 +16,13 @@ class AudioPlayerService {
   final AudioPlayer _player = AudioPlayer();
   List<Song> _playlist = [];
   int _currentIndex = -1;
+  PlayMode _playMode = PlayMode.sequence;
 
   // Getters
   AudioPlayer get player => _player;
   List<Song> get playlist => _playlist;
   int get currentIndex => _currentIndex;
+  PlayMode get playMode => _playMode;
   Song? get currentSong => _currentIndex >= 0 && _currentIndex < _playlist.length
       ? _playlist[_currentIndex]
       : null;
@@ -22,6 +31,42 @@ class AudioPlayerService {
   Stream<PlayerState> get playerStateStream => _player.playerStateStream;
   Stream<Duration> get positionStream => _player.positionStream;
   Stream<Duration?> get durationStream => _player.durationStream;
+
+  /// 设置播放模式
+  void setPlayMode(PlayMode mode) {
+    _playMode = mode;
+
+    // 根据播放模式设置 just_audio 的循环模式
+    switch (mode) {
+      case PlayMode.sequence:
+        _player.setLoopMode(LoopMode.off);
+        _player.setShuffleModeEnabled(false);
+        break;
+      case PlayMode.shuffle:
+        _player.setLoopMode(LoopMode.off);
+        _player.setShuffleModeEnabled(true);
+        break;
+      case PlayMode.repeatOne:
+        _player.setLoopMode(LoopMode.one);
+        _player.setShuffleModeEnabled(false);
+        break;
+    }
+  }
+
+  /// 切换播放模式
+  PlayMode togglePlayMode() {
+    switch (_playMode) {
+      case PlayMode.sequence:
+        setPlayMode(PlayMode.shuffle);
+        return PlayMode.shuffle;
+      case PlayMode.shuffle:
+        setPlayMode(PlayMode.repeatOne);
+        return PlayMode.repeatOne;
+      case PlayMode.repeatOne:
+        setPlayMode(PlayMode.sequence);
+        return PlayMode.sequence;
+    }
+  }
 
   /// 设置播放列表
   Future<void> setPlaylist(List<Song> songs, {int initialIndex = 0}) async {

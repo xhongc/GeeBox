@@ -28,18 +28,24 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   Future<void> _performSearch(String query) async {
     if (query.trim().isEmpty) {
-      ref.read(searchResultProvider.notifier).state = null;
+      if (mounted) {
+        ref.read(searchResultProvider.notifier).state = null;
+      }
       return;
     }
 
-    setState(() {
-      _isSearching = true;
-    });
+    if (mounted) {
+      setState(() {
+        _isSearching = true;
+      });
+    }
 
     try {
       final searchService = ref.read(searchServiceProvider);
       final result = await searchService.search(query);
-      ref.read(searchResultProvider.notifier).state = result;
+      if (mounted) {
+        ref.read(searchResultProvider.notifier).state = result;
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -47,16 +53,20 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         );
       }
     } finally {
-      setState(() {
-        _isSearching = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isSearching = false;
+        });
+      }
     }
   }
 
   void _clearSearch() {
     _searchController.clear();
-    ref.read(searchResultProvider.notifier).state = null;
-    setState(() {});
+    if (mounted) {
+      ref.read(searchResultProvider.notifier).state = null;
+      setState(() {});
+    }
   }
 
   @override

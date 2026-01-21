@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/audio_player_provider.dart';
+import '../providers/subsonic_provider.dart';
+import '../providers/music_repository_provider.dart';
 
 /// 底部迷你播放器
-class MiniPlayer extends StatelessWidget {
+class MiniPlayer extends ConsumerWidget {
   final VoidCallback onTap;
 
   const MiniPlayer({
@@ -10,9 +14,21 @@ class MiniPlayer extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final currentSong = ref.watch(currentSongProvider);
+    final playerState = ref.watch(playerStateProvider);
+    final audioService = ref.watch(audioPlayerServiceProvider);
+    final subsonicService = ref.watch(subsonicServiceProvider);
+    final repository = ref.watch(musicRepositoryProvider);
+
+    // 如果没有正在播放的歌曲，不显示迷你播放器
+    if (currentSong == null) {
+      return const SizedBox.shrink();
+    }
+
+    final isPlaying = playerState.value?.playing ?? false;
 
     return GestureDetector(
       onTap: onTap,
@@ -41,10 +57,24 @@ class MiniPlayer extends StatelessWidget {
                 color: Colors.grey[300],
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: const Icon(
-                Icons.music_note,
-                color: Colors.grey,
-              ),
+              child: currentSong.coverArt != null
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: Image.network(
+                        repository.getCoverArtUrl(currentSong.coverArt!),
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return const Icon(
+                            Icons.music_note,
+                            color: Colors.grey,
+                          );
+                        },
+                      ),
+                    )
+                  : const Icon(
+                      Icons.music_note,
+                      color: Colors.grey,
+                    ),
             ),
 
             // 歌曲信息
@@ -56,7 +86,7 @@ class MiniPlayer extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '歌曲名称',
+                      currentSong.title,
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -66,7 +96,7 @@ class MiniPlayer extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '艺术家',
+                      currentSong.artist ?? '未知艺术家',
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.grey[600],
@@ -81,15 +111,19 @@ class MiniPlayer extends StatelessWidget {
 
             // 控制按钮
             IconButton(
-              icon: const Icon(Icons.play_arrow),
+              icon: Icon(isPlaying ? Icons.pause : Icons.play_arrow),
               iconSize: 32,
               color: colorScheme.primary,
-              onPressed: () {},
+              onPressed: () {
+                audioService.playPause();
+              },
             ),
 
             IconButton(
               icon: const Icon(Icons.skip_next),
-              onPressed: () {},
+              onPressed: () {
+                audioService.next((id) => subsonicService.getStreamUrl(id));
+              },
             ),
 
             const SizedBox(width: 8),

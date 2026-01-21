@@ -4,6 +4,7 @@ import '../providers/playlist_provider.dart';
 import '../providers/music_repository_provider.dart';
 import 'playlist_management_screen.dart';
 import 'playlist_detail_screen.dart';
+import 'artists_screen.dart';
 
 // 音乐库统计 Provider
 final libraryStatsProvider = FutureProvider.autoDispose<Map<String, int>>((ref) async {
@@ -169,6 +170,58 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with AutomaticKee
             ),
           ),
 
+          // 快速访问
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '浏览',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildBrowseCard(
+                          context,
+                          '艺术家',
+                          Icons.person,
+                          Colors.orange,
+                          () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const ArtistsScreen(),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildBrowseCard(
+                          context,
+                          '专辑',
+                          Icons.album,
+                          Colors.purple,
+                          () {},
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SliverToBoxAdapter(child: SizedBox(height: 24)),
+
           // 我的歌单
           SliverToBoxAdapter(
             child: Padding(
@@ -271,6 +324,45 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with AutomaticKee
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBrowseCard(
+    BuildContext context,
+    String title,
+    IconData icon,
+    Color color,
+    VoidCallback onTap,
+  ) {
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: color, size: 32),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

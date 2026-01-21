@@ -305,11 +305,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     String title,
     IconData icon,
     Color color,
+    VoidCallback? onTap,
   ) {
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () {},
+        onTap: onTap,
         child: Container(
           padding: const EdgeInsets.all(12),
           child: Row(

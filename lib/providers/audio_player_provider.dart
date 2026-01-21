@@ -34,3 +34,6 @@ final currentPlaylistProvider = StateProvider<List<Song>>((ref) => []);
 
 // 当前播放索引 Provider
 final currentIndexProvider = StateProvider<int>((ref) => -1);
+
+// 播放模式 Provider
+final playModeProvider = StateProvider<PlayMode>((ref) => PlayMode.sequence);
