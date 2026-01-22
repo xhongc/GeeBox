@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../providers/theme_provider.dart';
 import '../theme/app_theme.dart';
 
@@ -47,6 +48,35 @@ class SettingsScreen extends ConsumerWidget {
                   subtitle: const Text('配置 Subsonic 服务器'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () {},
+                ),
+              ],
+            ),
+          ),
+
+          // 内容显示设置
+          SliverToBoxAdapter(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  child: Text(
+                    '内容显示',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey,
+                    ),
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.dashboard_customize),
+                  title: const Text('媒体类型'),
+                  subtitle: const Text('选择要显示的内容类型'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    context.push('/media-type-settings');
+                  },
                 ),
               ],
             ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/music_repository_provider.dart';
+import '../providers/media_type_settings_provider.dart';
 import '../models/album.dart';
 import '../widgets/error_view.dart';
 
@@ -27,6 +28,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final mediaSettings = ref.watch(mediaTypeSettingsProvider);
     final recentAlbumsAsync = ref.watch(recentAlbumsProvider);
     final randomAlbumsAsync = ref.watch(randomAlbumsProvider);
 
@@ -134,147 +136,307 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
           const SliverToBoxAdapter(child: SizedBox(height: 32)),
 
-          // 最近专辑
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    '最近专辑',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
+          // 音乐内容 - 最近专辑
+          if (mediaSettings.musicEnabled) ...[
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      '最近专辑',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      ref.invalidate(recentAlbumsProvider);
-                    },
-                    child: const Text('刷新'),
-                  ),
-                ],
+                    TextButton(
+                      onPressed: () {
+                        ref.invalidate(recentAlbumsProvider);
+                      },
+                      child: const Text('刷新'),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
 
-          recentAlbumsAsync.when(
-            data: (albums) {
-              if (albums.isEmpty) {
-                return const SliverToBoxAdapter(
-                  child: Padding(
-                    padding: EdgeInsets.all(32),
-                    child: Center(
-                      child: Text(
-                        '暂无数据',
-                        style: TextStyle(color: Colors.grey),
+            recentAlbumsAsync.when(
+              data: (albums) {
+                if (albums.isEmpty) {
+                  return const SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.all(32),
+                      child: Center(
+                        child: Text(
+                          '暂无数据',
+                          style: TextStyle(color: Colors.grey),
+                        ),
                       ),
+                    ),
+                  );
+                }
+                return SliverToBoxAdapter(
+                  child: SizedBox(
+                    height: 210,
+                    child: ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      scrollDirection: Axis.horizontal,
+                      itemCount: albums.length,
+                      itemBuilder: (context, index) {
+                        return _buildAlbumCard(context, albums[index]);
+                      },
                     ),
                   ),
                 );
-              }
-              return SliverToBoxAdapter(
+              },
+              loading: () => const SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.all(32),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+              ),
+              error: (error, stack) => SliverToBoxAdapter(
                 child: SizedBox(
-                  height: 210,
-                  child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    scrollDirection: Axis.horizontal,
-                    itemCount: albums.length,
-                    itemBuilder: (context, index) {
-                      return _buildAlbumCard(context, albums[index]);
-                    },
+                  height: 200,
+                  child: error.toErrorWidget(
+                    onRetry: () => ref.invalidate(recentAlbumsProvider),
                   ),
                 ),
-              );
-            },
-            loading: () => const SliverToBoxAdapter(
+              ),
+            ),
+
+            const SliverToBoxAdapter(child: SizedBox(height: 32)),
+          ],
+
+          // 播客内容
+          if (mediaSettings.podcastEnabled) ...[
+            SliverToBoxAdapter(
               child: Padding(
-                padding: EdgeInsets.all(32),
-                child: Center(child: CircularProgressIndicator()),
-              ),
-            ),
-            error: (error, stack) => SliverToBoxAdapter(
-              child: SizedBox(
-                height: 200,
-                child: error.toErrorWidget(
-                  onRetry: () => ref.invalidate(recentAlbumsProvider),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      '热门播客',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () {},
+                      child: const Text('查看全部'),
+                    ),
+                  ],
                 ),
               ),
             ),
-          ),
 
-          const SliverToBoxAdapter(child: SizedBox(height: 32)),
-
-          // 随机推荐
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    '随机推荐',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Center(
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.mic,
+                        size: 64,
+                        color: Colors.grey[400],
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        '播客功能即将推出',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
                   ),
-                  TextButton(
-                    onPressed: () {
-                      ref.invalidate(randomAlbumsProvider);
-                    },
-                    child: const Text('换一批'),
-                  ),
-                ],
+                ),
               ),
             ),
-          ),
 
-          randomAlbumsAsync.when(
-            data: (albums) {
-              if (albums.isEmpty) {
-                return const SliverToBoxAdapter(
-                  child: Padding(
-                    padding: EdgeInsets.all(32),
-                    child: Center(
-                      child: Text(
-                        '暂无数据',
-                        style: TextStyle(color: Colors.grey),
+            const SliverToBoxAdapter(child: SizedBox(height: 32)),
+          ],
+
+          // 有声书内容
+          if (mediaSettings.audiobookEnabled) ...[
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      '推荐有声书',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
                       ),
+                    ),
+                    TextButton(
+                      onPressed: () {},
+                      child: const Text('查看全部'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Center(
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.menu_book,
+                        size: 64,
+                        color: Colors.grey[400],
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        '有声书功能即将推出',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            const SliverToBoxAdapter(child: SizedBox(height: 32)),
+          ],
+
+          // 电台内容
+          if (mediaSettings.radioEnabled) ...[
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      '推荐电台',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () {},
+                      child: const Text('查看全部'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Center(
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.radio,
+                        size: 64,
+                        color: Colors.grey[400],
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        '电台功能即将推出',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            const SliverToBoxAdapter(child: SizedBox(height: 32)),
+          ],
+
+          // 音乐内容 - 随机推荐
+          if (mediaSettings.musicEnabled) ...[
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      '随机推荐',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        ref.invalidate(randomAlbumsProvider);
+                      },
+                      child: const Text('换一批'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            randomAlbumsAsync.when(
+              data: (albums) {
+                if (albums.isEmpty) {
+                  return const SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.all(32),
+                      child: Center(
+                        child: Text(
+                          '暂无数据',
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      ),
+                    ),
+                  );
+                }
+                return SliverToBoxAdapter(
+                  child: SizedBox(
+                    height: 210,
+                    child: ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      scrollDirection: Axis.horizontal,
+                      itemCount: albums.length,
+                      itemBuilder: (context, index) {
+                        return _buildAlbumCard(context, albums[index]);
+                      },
                     ),
                   ),
                 );
-              }
-              return SliverToBoxAdapter(
+              },
+              loading: () => const SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.all(32),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+              ),
+              error: (error, stack) => SliverToBoxAdapter(
                 child: SizedBox(
-                  height: 210,
-                  child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    scrollDirection: Axis.horizontal,
-                    itemCount: albums.length,
-                    itemBuilder: (context, index) {
-                      return _buildAlbumCard(context, albums[index]);
-                    },
+                  height: 200,
+                  child: error.toErrorWidget(
+                    onRetry: () => ref.invalidate(recentAlbumsProvider),
                   ),
                 ),
-              );
-            },
-            loading: () => const SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.all(32),
-                child: Center(child: CircularProgressIndicator()),
               ),
             ),
-            error: (error, stack) => SliverToBoxAdapter(
-              child: SizedBox(
-                height: 200,
-                child: error.toErrorWidget(
-                  onRetry: () => ref.invalidate(recentAlbumsProvider),
-                ),
-              ),
-            ),
-          ),
+          ],
 
           const SliverToBoxAdapter(child: SizedBox(height: 150)),
         ],

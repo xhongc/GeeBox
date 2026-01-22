@@ -8,6 +8,9 @@ Chanson 是一个基于 Flutter 开发的跨平台 Subsonic 音乐客户端，�
 
 ## 常用开发命令
 
+### flutter PATH
+/Users/macbookair/coding/flutter/flutter/bin
+
 ### 依赖管理
 ```bash
 # 安装依赖

@@ -12,6 +12,7 @@ import '../screens/play_history_screen.dart';
 import '../screens/play_queue_screen.dart';
 import '../screens/playlist_management_screen.dart';
 import '../screens/search_screen.dart';
+import '../screens/media_type_settings_screen.dart';
 
 bool _canEnterApp() {
   final settingsBox = Hive.box('settings');
@@ -101,6 +102,10 @@ final router = GoRouter(
     GoRoute(
       path: '/search',
       builder: (context, state) => const SearchScreen(),
+    ),
+    GoRoute(
+      path: '/media-type-settings',
+      builder: (context, state) => const MediaTypeSettingsScreen(),
     ),
   ],
 );
