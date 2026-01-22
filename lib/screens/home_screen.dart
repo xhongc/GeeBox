@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/music_repository_provider.dart';
 import '../models/album.dart';
+import '../widgets/error_view.dart';
 import 'search_screen.dart';
 import 'album_detail_screen.dart';
 import 'artists_screen.dart';
@@ -218,10 +219,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
             ),
             error: (error, stack) => SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(32),
-                child: Center(
-                  child: Text('加载失败: $error'),
+              child: SizedBox(
+                height: 200,
+                child: error.toErrorWidget(
+                  onRetry: () => ref.invalidate(recentAlbumsProvider),
                 ),
               ),
             ),
@@ -290,10 +291,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
             ),
             error: (error, stack) => SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(32),
-                child: Center(
-                  child: Text('加载失败: $error'),
+              child: SizedBox(
+                height: 200,
+                child: error.toErrorWidget(
+                  onRetry: () => ref.invalidate(recentAlbumsProvider),
                 ),
               ),
             ),

@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../models/song.dart';
 import '../models/album.dart';
 import '../models/artist.dart';
+import '../exceptions/subsonic_exceptions.dart';
 
 class SubsonicService {
   final Dio _dio;
@@ -34,19 +35,67 @@ class SubsonicService {
 
   bool get isConfigured => _isConfigured;
 
-  bool _ensureConfigured() {
+  /// 确保已配置，否则抛出异常
+  void _ensureConfigured() {
     if (!_isConfigured) {
-      debugPrint('SubsonicService not configured');
-      return false;
+      throw NotConfiguredException();
     }
-    return true;
+  }
+
+  /// 处理 Subsonic API 响应
+  T _handleResponse<T>(
+    Response response,
+    T Function(Map<String, dynamic>) parser,
+  ) {
+    if (response.statusCode == 200) {
+      final data = response.data['subsonic-response'];
+
+      // 检查 API 返回状态
+      if (data['status'] == 'failed') {
+        final error = data['error'];
+        final code = error['code'] as int;
+        final message = error['message'] as String;
+
+        // 认证错误
+        if (code == 40 || code == 41) {
+          throw AuthenticationException(message);
+        }
+
+        throw ServerException(code, message);
+      }
+
+      if (data['status'] == 'ok') {
+        return parser(data);
+      }
+    }
+
+    throw ServerException(
+      response.statusCode ?? 500,
+      'Unexpected response: ${response.statusCode}',
+    );
+  }
+
+  /// 处理 Dio 异常
+  Never _handleDioException(DioException e) {
+    if (e.type == DioExceptionType.connectionTimeout) {
+      throw NetworkException('连接超时，请检查网络连接');
+    } else if (e.type == DioExceptionType.receiveTimeout) {
+      throw NetworkException('接收数据超时');
+    } else if (e.type == DioExceptionType.connectionError) {
+      throw NetworkException('网络连接失败，请检查服务器地址');
+    } else if (e.type == DioExceptionType.badResponse) {
+      throw ServerException(
+        e.response?.statusCode ?? 500,
+        '服务器返回错误: ${e.response?.statusCode}',
+      );
+    }
+
+    throw NetworkException('网络请求失败: ${e.message}');
   }
 
   /// 生成认证参数
   Map<String, dynamic> _getAuthParams() {
-    if (!_ensureConfigured()) {
-      throw StateError('SubsonicService not configured');
-    }
+    _ensureConfigured();
     final salt = DateTime.now().millisecondsSinceEpoch.toString();
     final token = md5.convert(utf8.encode(_password + salt)).toString();
 
@@ -62,7 +111,7 @@ class SubsonicService {
 
   /// 测试服务器连接
   Future<bool> ping() async {
-    if (!_ensureConfigured()) return false;
+    if (!_isConfigured) return false;
     try {
       final response = await _dio.get(
         '$_serverUrl/rest/ping',
@@ -82,7 +131,8 @@ class SubsonicService {
 
   /// 获取随机歌曲
   Future<List<Song>> getRandomSongs({int size = 10}) async {
-    if (!_ensureConfigured()) return [];
+    _ensureConfigured();
+
     try {
       final params = _getAuthParams();
       params['size'] = size.toString();
@@ -92,17 +142,20 @@ class SubsonicService {
         queryParameters: params,
       );
 
-      if (response.statusCode == 200) {
-        final data = response.data['subsonic-response'];
-        if (data['status'] == 'ok' && data['randomSongs'] != null) {
+      return _handleResponse(response, (data) {
+        if (data['randomSongs'] != null && data['randomSongs']['song'] != null) {
           final songs = data['randomSongs']['song'] as List;
           return songs.map((json) => Song.fromJson(json)).toList();
         }
-      }
-      return [];
+        return <Song>[];
+      });
+    } on DioException catch (e) {
+      _handleDioException(e);
+    } on SubsonicException {
+      rethrow;
     } catch (e) {
       debugPrint('Get random songs error: $e');
-      return [];
+      throw ParseException('解析数据失败: $e');
     }
   }
 
@@ -112,7 +165,8 @@ class SubsonicService {
     int size = 20,
     int offset = 0,
   }) async {
-    if (!_ensureConfigured()) return [];
+    _ensureConfigured();
+
     try {
       final params = _getAuthParams();
       params['type'] = type;
@@ -124,23 +178,27 @@ class SubsonicService {
         queryParameters: params,
       );
 
-      if (response.statusCode == 200) {
-        final data = response.data['subsonic-response'];
-        if (data['status'] == 'ok' && data['albumList2'] != null) {
+      return _handleResponse(response, (data) {
+        if (data['albumList2'] != null && data['albumList2']['album'] != null) {
           final albums = data['albumList2']['album'] as List;
           return albums.map((json) => Album.fromJson(json)).toList();
         }
-      }
-      return [];
+        return <Album>[];
+      });
+    } on DioException catch (e) {
+      _handleDioException(e);
+    } on SubsonicException {
+      rethrow;
     } catch (e) {
       debugPrint('Get album list error: $e');
-      return [];
+      throw ParseException('解析专辑列表失败: $e');
     }
   }
 
   /// 获取专辑详情（包含歌曲列表）
   Future<List<Song>> getAlbum(String albumId) async {
-    if (!_ensureConfigured()) return [];
+    _ensureConfigured();
+
     try {
       final params = _getAuthParams();
       params['id'] = albumId;
@@ -150,23 +208,26 @@ class SubsonicService {
         queryParameters: params,
       );
 
-      if (response.statusCode == 200) {
-        final data = response.data['subsonic-response'];
-        if (data['status'] == 'ok' && data['album'] != null) {
+      return _handleResponse(response, (data) {
+        if (data['album'] != null && data['album']['song'] != null) {
           final songs = data['album']['song'] as List;
           return songs.map((json) => Song.fromJson(json)).toList();
         }
-      }
-      return [];
+        return <Song>[];
+      });
+    } on DioException catch (e) {
+      _handleDioException(e);
+    } on SubsonicException {
+      rethrow;
     } catch (e) {
       debugPrint('Get album error: $e');
-      return [];
+      throw ParseException('解析专辑详情失败: $e');
     }
   }
 
   /// 获取歌曲流媒体 URL
   String getStreamUrl(String songId) {
-    if (!_ensureConfigured()) return '';
+    if (!_isConfigured) return '';
     final params = _getAuthParams();
     params['id'] = songId;
 
@@ -179,7 +240,7 @@ class SubsonicService {
 
   /// 获取封面图片 URL
   String getCoverArtUrl(String coverArtId, {int size = 300}) {
-    if (!_ensureConfigured()) return '';
+    if (!_isConfigured) return '';
     final params = _getAuthParams();
     params['id'] = coverArtId;
     params['size'] = size.toString();
@@ -193,7 +254,7 @@ class SubsonicService {
 
   /// 搜索
   Future<Map<String, dynamic>> search(String query) async {
-    if (!_ensureConfigured()) return {'songs': [], 'albums': []};
+    if (!_isConfigured) return {'songs': [], 'albums': []};
     try {
       final params = _getAuthParams();
       params['query'] = query;
@@ -224,7 +285,7 @@ class SubsonicService {
 
   /// 获取所有播放列表
   Future<List<Map<String, dynamic>>> getPlaylists() async {
-    if (!_ensureConfigured()) return [];
+    if (!_isConfigured) return [];
     try {
       final params = _getAuthParams();
 
@@ -253,7 +314,7 @@ class SubsonicService {
 
   /// 获取播放列表详情（包含歌曲）
   Future<Map<String, dynamic>?> getPlaylist(String playlistId) async {
-    if (!_ensureConfigured()) return null;
+    if (!_isConfigured) return null;
     try {
       final params = _getAuthParams();
       params['id'] = playlistId;
@@ -281,7 +342,7 @@ class SubsonicService {
     required String name,
     String? comment,
   }) async {
-    if (!_ensureConfigured()) return null;
+    if (!_isConfigured) return null;
     try {
       final params = _getAuthParams();
       params['name'] = name;
@@ -318,7 +379,7 @@ class SubsonicService {
     String? name,
     String? comment,
   }) async {
-    if (!_ensureConfigured()) return false;
+    if (!_isConfigured) return false;
     try {
       final params = _getAuthParams();
       params['playlistId'] = playlistId;
@@ -350,7 +411,7 @@ class SubsonicService {
     required String playlistId,
     required String songId,
   }) async {
-    if (!_ensureConfigured()) return false;
+    if (!_isConfigured) return false;
     try {
       final params = _getAuthParams();
       params['playlistId'] = playlistId;
@@ -377,7 +438,7 @@ class SubsonicService {
     required String playlistId,
     required int songIndex,
   }) async {
-    if (!_ensureConfigured()) return false;
+    if (!_isConfigured) return false;
     try {
       final params = _getAuthParams();
       params['playlistId'] = playlistId;
@@ -401,7 +462,7 @@ class SubsonicService {
 
   /// 删除播放列表
   Future<bool> deletePlaylist(String playlistId) async {
-    if (!_ensureConfigured()) return false;
+    if (!_isConfigured) return false;
     try {
       final params = _getAuthParams();
       params['id'] = playlistId;
@@ -426,7 +487,7 @@ class SubsonicService {
 
   /// 获取所有艺术家（按字母索引）
   Future<List<Artist>> getArtists() async {
-    if (!_ensureConfigured()) return [];
+    if (!_isConfigured) return [];
     try {
       final params = _getAuthParams();
 
@@ -465,7 +526,7 @@ class SubsonicService {
 
   /// 获取艺术家详情（包含专辑列表）
   Future<Map<String, dynamic>?> getArtist(String artistId) async {
-    if (!_ensureConfigured()) return null;
+    if (!_isConfigured) return null;
     try {
       final params = _getAuthParams();
       params['id'] = artistId;
@@ -490,7 +551,7 @@ class SubsonicService {
 
   /// 收藏歌曲/专辑/艺术家
   Future<bool> star({String? id, String? albumId, String? artistId}) async {
-    if (!_ensureConfigured()) return false;
+    if (!_isConfigured) return false;
     try {
       final params = _getAuthParams();
       if (id != null) params['id'] = id;
@@ -515,7 +576,7 @@ class SubsonicService {
 
   /// 取消收藏歌曲/专辑/艺术家
   Future<bool> unstar({String? id, String? albumId, String? artistId}) async {
-    if (!_ensureConfigured()) return false;
+    if (!_isConfigured) return false;
     try {
       final params = _getAuthParams();
       if (id != null) params['id'] = id;
@@ -540,7 +601,7 @@ class SubsonicService {
 
   /// 获取收藏列表
   Future<List<Song>> getStarredSongs() async {
-    if (!_ensureConfigured()) return [];
+    if (!_isConfigured) return [];
     try {
       final response = await _dio.get(
         '$_serverUrl/rest/getStarred',
@@ -565,7 +626,7 @@ class SubsonicService {
 
   /// 提交播放记录（scrobble）
   Future<bool> scrobble(String id, {int? time, bool submission = true}) async {
-    if (!_ensureConfigured()) return false;
+    if (!_isConfigured) return false;
     try {
       final params = _getAuthParams();
       params['id'] = id;
@@ -594,7 +655,7 @@ class SubsonicService {
     int count = 10,
     int offset = 0,
   }) async {
-    if (!_ensureConfigured()) return [];
+    if (!_isConfigured) return [];
     try {
       final params = _getAuthParams();
       params['genre'] = genre;
@@ -624,7 +685,7 @@ class SubsonicService {
 
   /// 获取歌词
   Future<String?> getLyrics({String? artist, String? title}) async {
-    if (!_ensureConfigured()) return null;
+    if (!_isConfigured) return null;
     try {
       final params = _getAuthParams();
       if (artist != null) params['artist'] = artist;

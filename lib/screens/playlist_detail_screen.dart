@@ -37,7 +37,7 @@ class PlaylistDetailScreen extends ConsumerWidget {
                   child: Center(child: Text('加载失败: $error')),
                 ),
               ),
-              const SliverToBoxAdapter(child: SizedBox(height: 100)),
+              const SliverToBoxAdapter(child: SizedBox(height: 160)),
             ],
           );
         },
@@ -176,18 +176,27 @@ class PlaylistDetailScreen extends ConsumerWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            _formatDuration(song.duration ?? 0),
-            style: TextStyle(color: Colors.grey[600]),
-          ),
-          IconButton(
-            icon: const Icon(Icons.more_vert, size: 20),
-            onPressed: () => _showSongOptions(context, ref, song),
-          ),
-        ],
+      trailing: SizedBox(
+        width: 80,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            Flexible(
+              child: Text(
+                _formatDuration(song.duration ?? 0),
+                style: TextStyle(color: Colors.grey[600]),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.more_vert, size: 20),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              onPressed: () => _showSongOptions(context, ref, song),
+            ),
+          ],
+        ),
       ),
       onTap: () => _playSong(context, ref, song),
     );

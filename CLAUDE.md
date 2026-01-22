@@ -172,6 +172,30 @@ Data Sources (Network API via Dio, Hive Cache)
    - Service 层捕获异常并返回空列表/默认值
    - UI 层检查返回值并显示适当的提示
 
+5. **Dart/Flutter 常见错误避免**
+   - **void 返回值误用**：不要将 `void` 返回类型的方法用于条件判断
+     ```dart
+     // ❌ 错误：void 方法不能用于条件判断
+     void _ensureConfigured() { ... }
+     if (!_ensureConfigured()) return false;  // use_of_void_result 错误
+
+     // ✅ 正确：使用 bool 属性或返回 bool 的方法
+     bool get isConfigured => _isConfigured;
+     if (!isConfigured) return false;
+
+     // 或者：void 方法仅用于抛出异常，不用于条件判断
+     void _ensureConfigured() {
+       if (!_isConfigured) throw Exception();
+     }
+     _ensureConfigured();  // 直接调用，不用于条件判断
+     ```
+
+   - **异步方法必须处理返回值**：所有 `Future` 返回的方法必须用 `await` 或 `.then()` 处理
+
+   - **空安全检查**：使用 `?.`、`??` 和 `!` 时要确保逻辑正确，避免运行时空指针异常
+
+   - **修改代码后必须运行分析**：每次修改代码后运行 `flutter analyze` 确保没有引入新错误
+
 ## 项目文档
 
 - `README.md` - 技术栈和项目结构
