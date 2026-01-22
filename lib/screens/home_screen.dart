@@ -1,13 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../providers/music_repository_provider.dart';
 import '../models/album.dart';
 import '../widgets/error_view.dart';
-import 'search_screen.dart';
-import 'album_detail_screen.dart';
-import 'artists_screen.dart';
-import 'favorites_screen.dart';
-import 'play_history_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -52,12 +48,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               IconButton(
                 icon: const Icon(Icons.search),
                 onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const SearchScreen(),
-                    ),
-                  );
+                  context.push('/search');
                 },
               ),
             ],
@@ -106,12 +97,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         Icons.person,
                         Colors.orange,
                         () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const ArtistsScreen(),
-                            ),
-                          );
+                          context.push('/artists');
                         },
                       ),
                       _buildQuickAccessCard(
@@ -120,12 +106,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         Icons.favorite,
                         Colors.purple,
                         () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const FavoritesScreen(),
-                            ),
-                          );
+                          context.push('/favorites');
                         },
                       ),
                       _buildQuickAccessCard(
@@ -134,12 +115,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         Icons.history,
                         Colors.green,
                         () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const PlayHistoryScreen(),
-                            ),
-                          );
+                          context.push('/play-history');
                         },
                       ),
                       _buildQuickAccessCard(
@@ -368,17 +344,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       margin: const EdgeInsets.only(right: 16),
       child: InkWell(
         onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => AlbumDetailScreen(
-                albumId: album.id,
-                albumName: album.name,
-                albumArtist: album.artist,
-                coverArtId: album.coverArt,
-              ),
-            ),
-          );
+          context.push('/album-detail', extra: {
+            'albumId': album.id,
+            'albumName': album.name,
+            'albumArtist': album.artist,
+            'coverArtId': album.coverArt,
+          });
         },
         borderRadius: BorderRadius.circular(8),
         child: Column(

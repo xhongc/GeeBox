@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../models/song.dart';
 import '../models/album.dart';
 import '../providers/search_provider.dart';
@@ -7,7 +8,7 @@ import '../providers/audio_player_provider.dart';
 import '../providers/subsonic_provider.dart';
 import '../services/search_service.dart';
 import '../widgets/add_to_playlist_dialog.dart';
-import 'album_detail_screen.dart';
+import '../widgets/error_view.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});
@@ -220,25 +221,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         );
       },
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, stack) => Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline, size: 64, color: Colors.grey[400]),
-            const SizedBox(height: 16),
-            Text(
-              '加载搜索历史失败: $error',
-              style: TextStyle(color: Colors.grey[600]),
-            ),
-            const SizedBox(height: 8),
-            TextButton(
-              onPressed: () {
-                ref.invalidate(searchHistoryProvider);
-              },
-              child: const Text('重试'),
-            ),
-          ],
-        ),
+      error: (error, stack) => error.toErrorWidget(
+        onRetry: () => ref.invalidate(searchHistoryProvider),
       ),
     );
   }
@@ -368,17 +352,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         style: TextStyle(color: Colors.grey[600]),
       ),
       onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => AlbumDetailScreen(
-              albumId: album.id,
-              albumName: album.name,
-              albumArtist: album.artist,
-              coverArtId: album.coverArt,
-            ),
-          ),
-        );
+        context.push('/album-detail', extra: {
+          'albumId': album.id,
+          'albumName': album.name,
+          'albumArtist': album.artist,
+          'coverArtId': album.coverArt,
+        });
       },
     );
   }

@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../providers/music_repository_provider.dart';
 import '../models/artist.dart';
-import 'artist_detail_screen.dart';
+import '../widgets/error_view.dart';
 
 // 艺术家列表 Provider
 final artistsProvider = FutureProvider.autoDispose<List<Artist>>((ref) async {
@@ -108,20 +109,8 @@ class _ArtistsScreenState extends ConsumerState<ArtistsScreen> {
                 );
               },
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, stack) => Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text('加载失败: $error'),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: () {
-                        ref.invalidate(artistsProvider);
-                      },
-                      child: const Text('重试'),
-                    ),
-                  ],
-                ),
+              error: (error, stack) => error.toErrorWidget(
+                onRetry: () => ref.invalidate(artistsProvider),
               ),
             ),
           ),
@@ -207,16 +196,11 @@ class _ArtistsScreenState extends ConsumerState<ArtistsScreen> {
           : null,
       trailing: const Icon(Icons.chevron_right),
       onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ArtistDetailScreen(
-              artistId: artist.id,
-              artistName: artist.name,
-              coverArtId: artist.coverArt,
-            ),
-          ),
-        );
+        context.push('/artist-detail', extra: {
+          'artistId': artist.id,
+          'artistName': artist.name,
+          'coverArtId': artist.coverArt,
+        });
       },
     );
   }

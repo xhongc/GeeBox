@@ -5,6 +5,7 @@ import '../providers/audio_player_provider.dart';
 import '../providers/subsonic_provider.dart';
 import '../providers/music_repository_provider.dart';
 import '../models/song.dart';
+import '../widgets/error_view.dart';
 
 /// 我喜欢的音乐页面
 class FavoritesScreen extends ConsumerWidget {
@@ -48,25 +49,8 @@ class FavoritesScreen extends ConsumerWidget {
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stack) => Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.error_outline, size: 64, color: Colors.grey[400]),
-              const SizedBox(height: 16),
-              Text(
-                '加载失败: $error',
-                style: TextStyle(color: Colors.grey[600]),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () {
-                  ref.invalidate(starredSongsProvider);
-                },
-                child: const Text('重试'),
-              ),
-            ],
-          ),
+        error: (error, stack) => error.toErrorWidget(
+          onRetry: () => ref.invalidate(starredSongsProvider),
         ),
       ),
     );

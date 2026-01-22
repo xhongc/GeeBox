@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../providers/playlist_provider.dart';
 import '../models/playlist.dart';
-import 'playlist_detail_screen.dart';
+import '../widgets/error_view.dart';
 
 class PlaylistManagementScreen extends ConsumerWidget {
   const PlaylistManagementScreen({super.key});
@@ -23,8 +24,8 @@ class PlaylistManagementScreen extends ConsumerWidget {
           return _buildPlaylistGrid(context, ref, playlists);
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stack) => Center(
-          child: Text('加载失败: $error'),
+        error: (error, stack) => error.toErrorWidget(
+          onRetry: () => ref.invalidate(playlistsProvider),
         ),
       ),
       floatingActionButton: FloatingActionButton(
@@ -81,12 +82,9 @@ class PlaylistManagementScreen extends ConsumerWidget {
   Widget _buildPlaylistCard(BuildContext context, WidgetRef ref, Playlist playlist) {
     return InkWell(
       onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => PlaylistDetailScreen(playlistId: playlist.id),
-          ),
-        );
+        context.push('/playlist-detail', extra: {
+          'playlistId': playlist.id,
+        });
       },
       onLongPress: () => _showPlaylistOptions(context, ref, playlist),
       child: Card(

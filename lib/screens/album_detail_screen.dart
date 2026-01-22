@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/music_repository_provider.dart';
 import '../providers/audio_player_provider.dart';
 import '../models/song.dart';
+import '../widgets/error_view.dart';
 
 // 专辑详情 Provider
 final albumDetailProvider = FutureProvider.family<List<Song>, String>((ref, albumId) async {
@@ -198,11 +199,8 @@ class AlbumDetailScreen extends ConsumerWidget {
               ),
             ),
             error: (error, stack) => SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(32),
-                child: Center(
-                  child: Text('加载失败: $error'),
-                ),
+              child: error.toErrorWidget(
+                onRetry: () => ref.invalidate(albumDetailProvider(albumId)),
               ),
             ),
           ),

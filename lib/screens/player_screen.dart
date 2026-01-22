@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'dart:ui';
 import '../providers/audio_player_provider.dart';
 import '../providers/subsonic_provider.dart';
@@ -9,7 +10,6 @@ import '../providers/play_history_provider.dart';
 import '../providers/sleep_timer_provider.dart';
 import '../services/audio_player_service.dart';
 import '../widgets/lyrics_widget.dart';
-import 'play_queue_screen.dart';
 
 class PlayerScreen extends ConsumerStatefulWidget {
   const PlayerScreen({super.key});
@@ -417,12 +417,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                     IconButton(
                       icon: const Icon(Icons.queue_music),
                       onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const PlayQueueScreen(),
-                          ),
-                        );
+                        context.push('/play-queue');
                       },
                     ),
                   ],

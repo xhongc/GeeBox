@@ -4,6 +4,7 @@ import '../providers/playlist_provider.dart';
 import '../providers/audio_player_provider.dart';
 import '../providers/subsonic_provider.dart';
 import '../models/song.dart';
+import '../widgets/error_view.dart';
 
 class PlaylistDetailScreen extends ConsumerWidget {
   final String playlistId;
@@ -34,7 +35,9 @@ class PlaylistDetailScreen extends ConsumerWidget {
                   child: Center(child: CircularProgressIndicator()),
                 ),
                 error: (error, stack) => SliverFillRemaining(
-                  child: Center(child: Text('加载失败: $error')),
+                  child: error.toErrorWidget(
+                    onRetry: () => ref.invalidate(playlistSongsProvider(playlistId)),
+                  ),
                 ),
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 160)),
@@ -42,7 +45,9 @@ class PlaylistDetailScreen extends ConsumerWidget {
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stack) => Center(child: Text('加载失败: $error')),
+        error: (error, stack) => error.toErrorWidget(
+          onRetry: () => ref.invalidate(playlistProvider(playlistId)),
+        ),
       ),
     );
   }

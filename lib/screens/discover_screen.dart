@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../providers/music_repository_provider.dart';
 import '../models/album.dart';
-import 'search_screen.dart';
-import 'album_detail_screen.dart';
+import '../widgets/error_view.dart';
 
 class DiscoverScreen extends ConsumerStatefulWidget {
   const DiscoverScreen({super.key});
@@ -49,12 +49,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
               IconButton(
                 icon: const Icon(Icons.search),
                 onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const SearchScreen(),
-                    ),
-                  );
+                  context.push('/search');
                 },
               ),
             ],
@@ -148,11 +143,16 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
               ),
             ),
             error: (error, stack) => SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(32),
-                child: Center(
-                  child: Text('加载失败: $error'),
-                ),
+              child: error.toErrorWidget(
+                onRetry: () {
+                  if (_selectedCategory == 'newest') {
+                    ref.invalidate(recentAlbumsProvider);
+                  } else if (_selectedCategory == 'random') {
+                    ref.invalidate(randomAlbumsProvider);
+                  } else {
+                    ref.invalidate(frequentAlbumsProvider);
+                  }
+                },
               ),
             ),
           ),
@@ -194,17 +194,12 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
 
     return InkWell(
       onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => AlbumDetailScreen(
-              albumId: album.id,
-              albumName: album.name,
-              albumArtist: album.artist,
-              coverArtId: album.coverArt,
-            ),
-          ),
-        );
+        context.push('/album-detail', extra: {
+          'albumId': album.id,
+          'albumName': album.name,
+          'albumArtist': album.artist,
+          'coverArtId': album.coverArt,
+        });
       },
       borderRadius: BorderRadius.circular(8),
       child: Column(

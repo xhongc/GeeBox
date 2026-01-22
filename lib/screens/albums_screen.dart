@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../providers/music_repository_provider.dart';
 import '../models/album.dart';
-import 'album_detail_screen.dart';
+import '../widgets/error_view.dart';
 
 /// 专辑列表页面
 class AlbumsScreen extends ConsumerStatefulWidget {
@@ -87,25 +88,8 @@ class _AlbumsScreenState extends ConsumerState<AlbumsScreen> {
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stack) => Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.error_outline, size: 64, color: Colors.grey[400]),
-              const SizedBox(height: 16),
-              Text(
-                '加载失败: $error',
-                style: TextStyle(color: Colors.grey[600]),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () {
-                  ref.invalidate(albumListProvider(_sortType));
-                },
-                child: const Text('重试'),
-              ),
-            ],
-          ),
+        error: (error, stack) => error.toErrorWidget(
+          onRetry: () => ref.invalidate(albumListProvider(_sortType)),
         ),
       ),
     );
@@ -116,17 +100,12 @@ class _AlbumsScreenState extends ConsumerState<AlbumsScreen> {
 
     return InkWell(
       onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => AlbumDetailScreen(
-              albumId: album.id,
-              albumName: album.name,
-              albumArtist: album.artist,
-              coverArtId: album.coverArt,
-            ),
-          ),
-        );
+        context.push('/album-detail', extra: {
+          'albumId': album.id,
+          'albumName': album.name,
+          'albumArtist': album.artist,
+          'coverArtId': album.coverArt,
+        });
       },
       borderRadius: BorderRadius.circular(8),
       child: Column(

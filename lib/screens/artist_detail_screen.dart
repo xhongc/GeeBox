@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../providers/music_repository_provider.dart';
 import '../models/album.dart';
-import 'album_detail_screen.dart';
+import '../widgets/error_view.dart';
 
 // 艺术家详情 Provider
 final artistDetailProvider = FutureProvider.family<Map<String, dynamic>?, String>((ref, artistId) async {
@@ -158,22 +159,8 @@ class ArtistDetailScreen extends ConsumerWidget {
               ),
             ),
             error: (error, stack) => SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(32),
-                child: Center(
-                  child: Column(
-                    children: [
-                      Text('加载失败: $error'),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: () {
-                          ref.invalidate(artistDetailProvider(artistId));
-                        },
-                        child: const Text('重试'),
-                      ),
-                    ],
-                  ),
-                ),
+              child: error.toErrorWidget(
+                onRetry: () => ref.invalidate(artistDetailProvider(artistId)),
               ),
             ),
           ),
@@ -189,17 +176,12 @@ class ArtistDetailScreen extends ConsumerWidget {
 
     return InkWell(
       onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => AlbumDetailScreen(
-              albumId: album.id,
-              albumName: album.name,
-              albumArtist: album.artist,
-              coverArtId: album.coverArt,
-            ),
-          ),
-        );
+        context.push('/album-detail', extra: {
+          'albumId': album.id,
+          'albumName': album.name,
+          'albumArtist': album.artist,
+          'coverArtId': album.coverArt,
+        });
       },
       borderRadius: BorderRadius.circular(8),
       child: Column(

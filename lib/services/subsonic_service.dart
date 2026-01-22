@@ -254,7 +254,8 @@ class SubsonicService {
 
   /// 搜索
   Future<Map<String, dynamic>> search(String query) async {
-    if (!_isConfigured) return {'songs': [], 'albums': []};
+    _ensureConfigured();
+
     try {
       final params = _getAuthParams();
       params['query'] = query;
@@ -264,20 +265,23 @@ class SubsonicService {
         queryParameters: params,
       );
 
-      if (response.statusCode == 200) {
-        final data = response.data['subsonic-response'];
-        if (data['status'] == 'ok' && data['searchResult3'] != null) {
+      return _handleResponse(response, (data) {
+        if (data['searchResult3'] != null) {
           final result = data['searchResult3'];
           return {
             'songs': (result['song'] as List?)?.map((json) => Song.fromJson(json)).toList() ?? [],
             'albums': (result['album'] as List?)?.map((json) => Album.fromJson(json)).toList() ?? [],
           };
         }
-      }
-      return {'songs': [], 'albums': []};
+        return {'songs': <Song>[], 'albums': <Album>[]};
+      });
+    } on DioException catch (e) {
+      _handleDioException(e);
+    } on SubsonicException {
+      rethrow;
     } catch (e) {
       debugPrint('Search error: $e');
-      return {'songs': [], 'albums': []};
+      throw ParseException('搜索失败: $e');
     }
   }
 
@@ -285,7 +289,8 @@ class SubsonicService {
 
   /// 获取所有播放列表
   Future<List<Map<String, dynamic>>> getPlaylists() async {
-    if (!_isConfigured) return [];
+    _ensureConfigured();
+
     try {
       final params = _getAuthParams();
 
@@ -294,9 +299,8 @@ class SubsonicService {
         queryParameters: params,
       );
 
-      if (response.statusCode == 200) {
-        final data = response.data['subsonic-response'];
-        if (data['status'] == 'ok' && data['playlists'] != null) {
+      return _handleResponse(response, (data) {
+        if (data['playlists'] != null) {
           final playlists = data['playlists']['playlist'];
           if (playlists is List) {
             return playlists.cast<Map<String, dynamic>>();
@@ -304,17 +308,22 @@ class SubsonicService {
             return [playlists.cast<String, dynamic>()];
           }
         }
-      }
-      return [];
+        return <Map<String, dynamic>>[];
+      });
+    } on DioException catch (e) {
+      _handleDioException(e);
+    } on SubsonicException {
+      rethrow;
     } catch (e) {
       debugPrint('Get playlists error: $e');
-      return [];
+      throw ParseException('获取播放列表失败: $e');
     }
   }
 
   /// 获取播放列表详情（包含歌曲）
   Future<Map<String, dynamic>?> getPlaylist(String playlistId) async {
-    if (!_isConfigured) return null;
+    _ensureConfigured();
+
     try {
       final params = _getAuthParams();
       params['id'] = playlistId;
@@ -324,16 +333,19 @@ class SubsonicService {
         queryParameters: params,
       );
 
-      if (response.statusCode == 200) {
-        final data = response.data['subsonic-response'];
-        if (data['status'] == 'ok' && data['playlist'] != null) {
+      return _handleResponse(response, (data) {
+        if (data['playlist'] != null) {
           return data['playlist'];
         }
-      }
-      return null;
+        return null;
+      });
+    } on DioException catch (e) {
+      _handleDioException(e);
+    } on SubsonicException {
+      rethrow;
     } catch (e) {
       debugPrint('Get playlist error: $e');
-      return null;
+      throw ParseException('获取播放列表详情失败: $e');
     }
   }
 
@@ -342,7 +354,8 @@ class SubsonicService {
     required String name,
     String? comment,
   }) async {
-    if (!_isConfigured) return null;
+    _ensureConfigured();
+
     try {
       final params = _getAuthParams();
       params['name'] = name;
@@ -355,21 +368,21 @@ class SubsonicService {
         queryParameters: params,
       );
 
-      if (response.statusCode == 200) {
-        final data = response.data['subsonic-response'];
-        if (data['status'] == 'ok') {
-          // 1.14.0+ 版本会返回创建的播放列表
-          if (data['playlist'] != null) {
-            return data['playlist']['id'];
-          }
-          // 早期版本需要重新获取播放列表列表来找到新创建的
-          return null;
+      return _handleResponse(response, (data) {
+        // 1.14.0+ 版本会返回创建的播放列表
+        if (data['playlist'] != null) {
+          return data['playlist']['id'];
         }
-      }
-      return null;
+        // 早期版本需要重新获取播放列表列表来找到新创建的
+        return null;
+      });
+    } on DioException catch (e) {
+      _handleDioException(e);
+    } on SubsonicException {
+      rethrow;
     } catch (e) {
       debugPrint('Create playlist error: $e');
-      return null;
+      throw ParseException('创建播放列表失败: $e');
     }
   }
 
@@ -379,7 +392,8 @@ class SubsonicService {
     String? name,
     String? comment,
   }) async {
-    if (!_isConfigured) return false;
+    _ensureConfigured();
+
     try {
       final params = _getAuthParams();
       params['playlistId'] = playlistId;
@@ -395,14 +409,14 @@ class SubsonicService {
         queryParameters: params,
       );
 
-      if (response.statusCode == 200) {
-        final data = response.data['subsonic-response'];
-        return data['status'] == 'ok';
-      }
-      return false;
+      return _handleResponse(response, (data) => true);
+    } on DioException catch (e) {
+      _handleDioException(e);
+    } on SubsonicException {
+      rethrow;
     } catch (e) {
       debugPrint('Update playlist info error: $e');
-      return false;
+      throw ParseException('更新播放列表信息失败: $e');
     }
   }
 
@@ -411,7 +425,8 @@ class SubsonicService {
     required String playlistId,
     required String songId,
   }) async {
-    if (!_isConfigured) return false;
+    _ensureConfigured();
+
     try {
       final params = _getAuthParams();
       params['playlistId'] = playlistId;
@@ -422,14 +437,14 @@ class SubsonicService {
         queryParameters: params,
       );
 
-      if (response.statusCode == 200) {
-        final data = response.data['subsonic-response'];
-        return data['status'] == 'ok';
-      }
-      return false;
+      return _handleResponse(response, (data) => true);
+    } on DioException catch (e) {
+      _handleDioException(e);
+    } on SubsonicException {
+      rethrow;
     } catch (e) {
       debugPrint('Add song to playlist error: $e');
-      return false;
+      throw ParseException('添加歌曲到播放列表失败: $e');
     }
   }
 
@@ -438,7 +453,8 @@ class SubsonicService {
     required String playlistId,
     required int songIndex,
   }) async {
-    if (!_isConfigured) return false;
+    _ensureConfigured();
+
     try {
       final params = _getAuthParams();
       params['playlistId'] = playlistId;
@@ -449,20 +465,21 @@ class SubsonicService {
         queryParameters: params,
       );
 
-      if (response.statusCode == 200) {
-        final data = response.data['subsonic-response'];
-        return data['status'] == 'ok';
-      }
-      return false;
+      return _handleResponse(response, (data) => true);
+    } on DioException catch (e) {
+      _handleDioException(e);
+    } on SubsonicException {
+      rethrow;
     } catch (e) {
       debugPrint('Remove song from playlist error: $e');
-      return false;
+      throw ParseException('从播放列表移除歌曲失败: $e');
     }
   }
 
   /// 删除播放列表
   Future<bool> deletePlaylist(String playlistId) async {
-    if (!_isConfigured) return false;
+    _ensureConfigured();
+
     try {
       final params = _getAuthParams();
       params['id'] = playlistId;
@@ -472,14 +489,14 @@ class SubsonicService {
         queryParameters: params,
       );
 
-      if (response.statusCode == 200) {
-        final data = response.data['subsonic-response'];
-        return data['status'] == 'ok';
-      }
-      return false;
+      return _handleResponse(response, (data) => true);
+    } on DioException catch (e) {
+      _handleDioException(e);
+    } on SubsonicException {
+      rethrow;
     } catch (e) {
       debugPrint('Delete playlist error: $e');
-      return false;
+      throw ParseException('删除播放列表失败: $e');
     }
   }
 
@@ -487,7 +504,8 @@ class SubsonicService {
 
   /// 获取所有艺术家（按字母索引）
   Future<List<Artist>> getArtists() async {
-    if (!_isConfigured) return [];
+    _ensureConfigured();
+
     try {
       final params = _getAuthParams();
 
@@ -496,9 +514,8 @@ class SubsonicService {
         queryParameters: params,
       );
 
-      if (response.statusCode == 200) {
-        final data = response.data['subsonic-response'];
-        if (data['status'] == 'ok' && data['artists'] != null) {
+      return _handleResponse(response, (data) {
+        if (data['artists'] != null) {
           final artists = <Artist>[];
           final indexes = data['artists']['index'];
 
@@ -516,17 +533,22 @@ class SubsonicService {
           }
           return artists;
         }
-      }
-      return [];
+        return <Artist>[];
+      });
+    } on DioException catch (e) {
+      _handleDioException(e);
+    } on SubsonicException {
+      rethrow;
     } catch (e) {
       debugPrint('Get artists error: $e');
-      return [];
+      throw ParseException('获取艺术家列表失败: $e');
     }
   }
 
   /// 获取艺术家详情（包含专辑列表）
   Future<Map<String, dynamic>?> getArtist(String artistId) async {
-    if (!_isConfigured) return null;
+    _ensureConfigured();
+
     try {
       final params = _getAuthParams();
       params['id'] = artistId;
@@ -536,22 +558,26 @@ class SubsonicService {
         queryParameters: params,
       );
 
-      if (response.statusCode == 200) {
-        final data = response.data['subsonic-response'];
-        if (data['status'] == 'ok' && data['artist'] != null) {
+      return _handleResponse(response, (data) {
+        if (data['artist'] != null) {
           return data['artist'];
         }
-      }
-      return null;
+        return null;
+      });
+    } on DioException catch (e) {
+      _handleDioException(e);
+    } on SubsonicException {
+      rethrow;
     } catch (e) {
       debugPrint('Get artist error: $e');
-      return null;
+      throw ParseException('获取艺术家详情失败: $e');
     }
   }
 
   /// 收藏歌曲/专辑/艺术家
   Future<bool> star({String? id, String? albumId, String? artistId}) async {
-    if (!_isConfigured) return false;
+    _ensureConfigured();
+
     try {
       final params = _getAuthParams();
       if (id != null) params['id'] = id;
@@ -563,20 +589,21 @@ class SubsonicService {
         queryParameters: params,
       );
 
-      if (response.statusCode == 200) {
-        final data = response.data['subsonic-response'];
-        return data['status'] == 'ok';
-      }
-      return false;
+      return _handleResponse(response, (data) => true);
+    } on DioException catch (e) {
+      _handleDioException(e);
+    } on SubsonicException {
+      rethrow;
     } catch (e) {
       debugPrint('Star error: $e');
-      return false;
+      throw ParseException('收藏失败: $e');
     }
   }
 
   /// 取消收藏歌曲/专辑/艺术家
   Future<bool> unstar({String? id, String? albumId, String? artistId}) async {
-    if (!_isConfigured) return false;
+    _ensureConfigured();
+
     try {
       final params = _getAuthParams();
       if (id != null) params['id'] = id;
@@ -588,45 +615,50 @@ class SubsonicService {
         queryParameters: params,
       );
 
-      if (response.statusCode == 200) {
-        final data = response.data['subsonic-response'];
-        return data['status'] == 'ok';
-      }
-      return false;
+      return _handleResponse(response, (data) => true);
+    } on DioException catch (e) {
+      _handleDioException(e);
+    } on SubsonicException {
+      rethrow;
     } catch (e) {
       debugPrint('Unstar error: $e');
-      return false;
+      throw ParseException('取消收藏失败: $e');
     }
   }
 
   /// 获取收藏列表
   Future<List<Song>> getStarredSongs() async {
-    if (!_isConfigured) return [];
+    _ensureConfigured();
+
     try {
       final response = await _dio.get(
         '$_serverUrl/rest/getStarred',
         queryParameters: _getAuthParams(),
       );
 
-      if (response.statusCode == 200) {
-        final data = response.data['subsonic-response'];
-        if (data['status'] == 'ok' && data['starred'] != null) {
+      return _handleResponse(response, (data) {
+        if (data['starred'] != null) {
           final songs = data['starred']['song'] as List?;
           if (songs != null) {
             return songs.map((json) => Song.fromJson(json)).toList();
           }
         }
-      }
-      return [];
+        return <Song>[];
+      });
+    } on DioException catch (e) {
+      _handleDioException(e);
+    } on SubsonicException {
+      rethrow;
     } catch (e) {
       debugPrint('Get starred songs error: $e');
-      return [];
+      throw ParseException('获取收藏列表失败: $e');
     }
   }
 
   /// 提交播放记录（scrobble）
   Future<bool> scrobble(String id, {int? time, bool submission = true}) async {
-    if (!_isConfigured) return false;
+    _ensureConfigured();
+
     try {
       final params = _getAuthParams();
       params['id'] = id;
@@ -638,14 +670,14 @@ class SubsonicService {
         queryParameters: params,
       );
 
-      if (response.statusCode == 200) {
-        final data = response.data['subsonic-response'];
-        return data['status'] == 'ok';
-      }
-      return false;
+      return _handleResponse(response, (data) => true);
+    } on DioException catch (e) {
+      _handleDioException(e);
+    } on SubsonicException {
+      rethrow;
     } catch (e) {
       debugPrint('Scrobble error: $e');
-      return false;
+      throw ParseException('提交播放记录失败: $e');
     }
   }
 
@@ -655,7 +687,8 @@ class SubsonicService {
     int count = 10,
     int offset = 0,
   }) async {
-    if (!_isConfigured) return [];
+    _ensureConfigured();
+
     try {
       final params = _getAuthParams();
       params['genre'] = genre;
@@ -667,25 +700,29 @@ class SubsonicService {
         queryParameters: params,
       );
 
-      if (response.statusCode == 200) {
-        final data = response.data['subsonic-response'];
-        if (data['status'] == 'ok' && data['songsByGenre'] != null) {
+      return _handleResponse(response, (data) {
+        if (data['songsByGenre'] != null) {
           final songs = data['songsByGenre']['song'] as List?;
           if (songs != null) {
             return songs.map((json) => Song.fromJson(json)).toList();
           }
         }
-      }
-      return [];
+        return <Song>[];
+      });
+    } on DioException catch (e) {
+      _handleDioException(e);
+    } on SubsonicException {
+      rethrow;
     } catch (e) {
       debugPrint('Get songs by genre error: $e');
-      return [];
+      throw ParseException('按类型获取歌曲失败: $e');
     }
   }
 
   /// 获取歌词
   Future<String?> getLyrics({String? artist, String? title}) async {
-    if (!_isConfigured) return null;
+    _ensureConfigured();
+
     try {
       final params = _getAuthParams();
       if (artist != null) params['artist'] = artist;
@@ -696,9 +733,8 @@ class SubsonicService {
         queryParameters: params,
       );
 
-      if (response.statusCode == 200) {
-        final data = response.data['subsonic-response'];
-        if (data['status'] == 'ok' && data['lyrics'] != null) {
+      return _handleResponse(response, (data) {
+        if (data['lyrics'] != null) {
           // 歌词内容在 lyrics 节点的文本中
           final lyrics = data['lyrics'];
           if (lyrics is Map && lyrics['value'] != null) {
@@ -707,11 +743,15 @@ class SubsonicService {
             return lyrics;
           }
         }
-      }
-      return null;
+        return null;
+      });
+    } on DioException catch (e) {
+      _handleDioException(e);
+    } on SubsonicException {
+      rethrow;
     } catch (e) {
       debugPrint('Get lyrics error: $e');
-      return null;
+      throw ParseException('获取歌词失败: $e');
     }
   }
 }

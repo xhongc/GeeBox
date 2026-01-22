@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../providers/playlist_provider.dart';
 import '../providers/music_repository_provider.dart';
-import 'playlist_management_screen.dart';
-import 'playlist_detail_screen.dart';
-import 'artists_screen.dart';
-import 'albums_screen.dart';
+import '../widgets/error_view.dart';
 
 // 音乐库统计 Provider
 final libraryStatsProvider = FutureProvider.autoDispose<Map<String, int>>((ref) async {
@@ -47,12 +45,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with AutomaticKee
               IconButton(
                 icon: const Icon(Icons.add),
                 onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const PlaylistManagementScreen(),
-                    ),
-                  );
+                  context.push('/playlist-management');
                 },
               ),
             ],
@@ -195,12 +188,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with AutomaticKee
                           Icons.person,
                           Colors.orange,
                           () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const ArtistsScreen(),
-                              ),
-                            );
+                            context.push('/artists');
                           },
                         ),
                       ),
@@ -212,12 +200,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with AutomaticKee
                           Icons.album,
                           Colors.purple,
                           () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const AlbumsScreen(),
-                              ),
-                            );
+                            context.push('/albums');
                           },
                         ),
                       ),
@@ -246,12 +229,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with AutomaticKee
                   ),
                   TextButton(
                     onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const PlaylistManagementScreen(),
-                        ),
-                      );
+                      context.push('/playlist-management');
                     },
                     child: const Text('管理'),
                   ),
@@ -294,11 +272,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with AutomaticKee
               ),
             ),
             error: (error, stack) => SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(32),
-                child: Center(
-                  child: Text('加载失败: $error'),
-                ),
+              child: error.toErrorWidget(
+                onRetry: () => ref.invalidate(playlistsProvider),
               ),
             ),
           ),
@@ -397,12 +372,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with AutomaticKee
         onPressed: () {},
       ),
       onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => PlaylistDetailScreen(playlistId: playlist.id),
-          ),
-        );
+        context.push('/playlist-detail', extra: {
+          'playlistId': playlist.id,
+        });
       },
     );
   }
