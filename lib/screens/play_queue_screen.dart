@@ -12,8 +12,10 @@ class PlayQueueScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final audioService = ref.watch(audioPlayerServiceProvider);
-    final playlist = audioService.playlist;
-    final currentIndex = audioService.currentIndex;
+    final playlistAsync = ref.watch(currentPlaylistProvider);
+    final currentIndexAsync = ref.watch(currentIndexProvider);
+    final playlist = playlistAsync.value ?? const <Song>[];
+    final currentIndex = currentIndexAsync.value ?? -1;
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -55,8 +57,6 @@ class PlayQueueScreen extends ConsumerWidget {
                   newIndex -= 1;
                 }
                 audioService.moveInQueue(oldIndex, newIndex);
-                // 强制刷新 UI
-                ref.read(currentPlaylistProvider.notifier).state = List.from(playlist);
               },
               itemBuilder: (context, index) {
                 final song = playlist[index];
@@ -107,7 +107,6 @@ class PlayQueueScreen extends ConsumerWidget {
       },
       onDismissed: (direction) {
         audioService.removeFromQueue(index);
-        ref.read(currentPlaylistProvider.notifier).state = List.from(audioService.playlist);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('已从队列中移除 ${song.title}')),
         );
@@ -179,9 +178,10 @@ class PlayQueueScreen extends ConsumerWidget {
               : null,
           onTap: () {
             if (!isCurrentSong) {
-              final streamUrl = subsonicService.getStreamUrl(song.id);
-              audioService.playSong(song, streamUrl);
-              ref.read(currentIndexProvider.notifier).state = index;
+              audioService.playAtIndex(
+                index,
+                (songId) => subsonicService.getStreamUrl(songId),
+              );
             }
           },
         ),
@@ -204,7 +204,6 @@ class PlayQueueScreen extends ConsumerWidget {
             onPressed: () {
               final audioService = ref.read(audioPlayerServiceProvider);
               audioService.clearQueue();
-              ref.read(currentPlaylistProvider.notifier).state = [];
               Navigator.pop(context);
               Navigator.pop(context); // 关闭队列页面
               ScaffoldMessenger.of(context).showSnackBar(

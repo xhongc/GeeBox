@@ -145,76 +145,101 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   Widget _buildSearchHistory() {
     final searchService = ref.watch(searchServiceProvider);
-    final history = searchService.getSearchHistory();
+    final historyAsync = ref.watch(searchHistoryProvider);
 
-    if (history.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+    return historyAsync.when(
+      data: (history) {
+        if (history.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.history, size: 64, color: Colors.grey[400]),
+                const SizedBox(height: 16),
+                Text(
+                  '暂无搜索历史',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.history, size: 64, color: Colors.grey[400]),
-            const SizedBox(height: 16),
-            Text(
-              '暂无搜索历史',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey[600],
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    '搜索历史',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () async {
+                      await searchService.clearSearchHistory();
+                      ref.invalidate(searchHistoryProvider);
+                    },
+                    child: const Text('清空'),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ListView.builder(
+                itemCount: history.length,
+                itemBuilder: (context, index) {
+                  final item = history[index];
+                  return ListTile(
+                    leading: const Icon(Icons.history),
+                    title: Text(item.query),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.close, size: 20),
+                      onPressed: () async {
+                        await searchService.deleteSearchHistory(item.query);
+                        ref.invalidate(searchHistoryProvider);
+                      },
+                    ),
+                    onTap: () {
+                      _searchController.text = item.query;
+                      _performSearch(item.query);
+                    },
+                  );
+                },
               ),
             ),
           ],
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, stack) => Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, size: 64, color: Colors.grey[400]),
+            const SizedBox(height: 16),
+            Text(
+              '加载搜索历史失败: $error',
+              style: TextStyle(color: Colors.grey[600]),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () {
+                ref.invalidate(searchHistoryProvider);
+              },
+              child: const Text('重试'),
+            ),
+          ],
         ),
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                '搜索历史',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              TextButton(
-                onPressed: () async {
-                  await searchService.clearSearchHistory();
-                  setState(() {});
-                },
-                child: const Text('清空'),
-              ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: ListView.builder(
-            itemCount: history.length,
-            itemBuilder: (context, index) {
-              final item = history[index];
-              return ListTile(
-                leading: const Icon(Icons.history),
-                title: Text(item.query),
-                trailing: IconButton(
-                  icon: const Icon(Icons.close, size: 20),
-                  onPressed: () async {
-                    await searchService.deleteSearchHistory(item.query);
-                    setState(() {});
-                  },
-                ),
-                onTap: () {
-                  _searchController.text = item.query;
-                  _performSearch(item.query);
-                },
-              );
-            },
-          ),
-        ),
-      ],
+      ),
     );
   }
 

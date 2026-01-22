@@ -24,7 +24,7 @@ class LyricsWidget extends ConsumerWidget {
       );
     }
 
-    final lyrics = ref.watch(lyricsProvider({'artist': artist, 'title': title}));
+    final lyrics = ref.watch(lyricsProvider(LyricsQuery(artist: artist, title: title)));
 
     return lyrics.when(
       data: (lyricsText) {

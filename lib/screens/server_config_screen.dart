@@ -69,6 +69,7 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
           await settingsBox.put('serverUrl', serverUrl);
           await settingsBox.put('username', username);
           await settingsBox.put('password', password);
+          await settingsBox.put('skip_config', false);
 
           // 更新 Provider
           ref.read(serverConfigProvider.notifier).state = ServerConfig(
@@ -237,7 +238,12 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
               ),
               const SizedBox(height: 16),
               TextButton(
-                onPressed: () => context.go('/'),
+                onPressed: () async {
+                  final settingsBox = Hive.box('settings');
+                  await settingsBox.put('skip_config', true);
+                  if (!context.mounted) return;
+                  context.go('/');
+                },
                 child: const Text('跳过'),
               ),
             ],

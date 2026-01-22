@@ -83,6 +83,12 @@ class SearchService {
     return history;
   }
 
+  /// 异步获取搜索历史（确保 box 已初始化）
+  Future<List<SearchHistory>> getSearchHistoryAsync() async {
+    await _ensureBox();
+    return getSearchHistory();
+  }
+
   /// 清除搜索历史
   Future<void> clearSearchHistory() async {
     final box = await _ensureBox();

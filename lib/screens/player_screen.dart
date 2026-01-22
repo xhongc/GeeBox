@@ -40,12 +40,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     final duration = ref.watch(durationProvider);
     final subsonicService = ref.watch(subsonicServiceProvider);
     final repository = ref.watch(musicRepositoryProvider);
-
-    // 监听 stream 来触发重建
-    ref.listen(currentSongProvider, (previous, next) {});
-
-    // 直接从 service 获取当前歌曲
-    final currentSong = audioService.currentSong;
+    final currentSong = ref.watch(currentSongProvider).value;
 
     // 如果没有歌曲，返回空页面
     if (currentSong == null) {
@@ -70,7 +65,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     final progress = totalDuration.inSeconds > 0
         ? currentPosition.inSeconds / totalDuration.inSeconds
         : 0.0;
-    final playMode = ref.watch(playModeProvider);
+    final playMode = ref.watch(playModeProvider).value ?? PlayMode.sequence;
 
     // 模拟专辑颜色
     final albumColor = colorScheme.primary;
@@ -334,10 +329,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                       onPressed: () {
                         if (playMode == PlayMode.shuffle) {
                           audioService.setPlayMode(PlayMode.sequence);
-                          ref.read(playModeProvider.notifier).state = PlayMode.sequence;
                         } else {
                           audioService.setPlayMode(PlayMode.shuffle);
-                          ref.read(playModeProvider.notifier).state = PlayMode.shuffle;
                         }
                       },
                     ),
@@ -393,10 +386,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                       onPressed: () {
                         if (playMode == PlayMode.repeatOne) {
                           audioService.setPlayMode(PlayMode.sequence);
-                          ref.read(playModeProvider.notifier).state = PlayMode.sequence;
                         } else {
                           audioService.setPlayMode(PlayMode.repeatOne);
-                          ref.read(playModeProvider.notifier).state = PlayMode.repeatOne;
                         }
                       },
                     ),
@@ -511,68 +502,70 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   }
 
   void _showSleepTimerDialog(BuildContext context) {
-    final sleepTimerService = ref.read(sleepTimerServiceProvider);
-    final isRunning = sleepTimerService.isRunning;
-
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('睡眠定时器'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (isRunning) ...[
-              Text(
-                '定时器正在运行',
-                style: TextStyle(color: Colors.grey[600]),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () {
-                  sleepTimerService.cancel();
-                  ref.read(sleepTimerStateProvider.notifier).state++;
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('已取消睡眠定时器')),
-                  );
-                },
-                child: const Text('取消定时器'),
-              ),
-              const SizedBox(height: 8),
-            ],
-            ListTile(
-              title: const Text('15 分钟'),
-              onTap: () => _setSleepTimer(context, const Duration(minutes: 15)),
+      builder: (context) => Consumer(
+        builder: (context, ref, child) {
+          final sleepTimerState = ref.watch(sleepTimerControllerProvider);
+          final sleepTimerController = ref.read(sleepTimerControllerProvider.notifier);
+          final isRunning = sleepTimerState.isRunning;
+
+          return AlertDialog(
+            title: const Text('睡眠定时器'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (isRunning) ...[
+                  Text(
+                    '定时器正在运行',
+                    style: TextStyle(color: Colors.grey[600]),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () {
+                      sleepTimerController.cancel();
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('已取消睡眠定时器')),
+                      );
+                    },
+                    child: const Text('取消定时器'),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                ListTile(
+                  title: const Text('15 分钟'),
+                  onTap: () => _setSleepTimer(context, const Duration(minutes: 15)),
+                ),
+                ListTile(
+                  title: const Text('30 分钟'),
+                  onTap: () => _setSleepTimer(context, const Duration(minutes: 30)),
+                ),
+                ListTile(
+                  title: const Text('45 分钟'),
+                  onTap: () => _setSleepTimer(context, const Duration(minutes: 45)),
+                ),
+                ListTile(
+                  title: const Text('60 分钟'),
+                  onTap: () => _setSleepTimer(context, const Duration(minutes: 60)),
+                ),
+              ],
             ),
-            ListTile(
-              title: const Text('30 分钟'),
-              onTap: () => _setSleepTimer(context, const Duration(minutes: 30)),
-            ),
-            ListTile(
-              title: const Text('45 分钟'),
-              onTap: () => _setSleepTimer(context, const Duration(minutes: 45)),
-            ),
-            ListTile(
-              title: const Text('60 分钟'),
-              onTap: () => _setSleepTimer(context, const Duration(minutes: 60)),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
 
   void _setSleepTimer(BuildContext context, Duration duration) {
-    final sleepTimerService = ref.read(sleepTimerServiceProvider);
+    final sleepTimerController = ref.read(sleepTimerControllerProvider.notifier);
     final audioService = ref.read(audioPlayerServiceProvider);
 
-    sleepTimerService.setTimer(duration, () {
+    sleepTimerController.setTimer(duration, () {
       // 定时器结束时停止播放
       audioService.stop();
-      ref.read(sleepTimerStateProvider.notifier).state++;
     });
 
-    ref.read(sleepTimerStateProvider.notifier).state++;
     Navigator.pop(context);
 
     final minutes = duration.inMinutes;

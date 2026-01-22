@@ -33,10 +33,19 @@ final durationProvider = StreamProvider<Duration?>((ref) {
 });
 
 // 当前播放队列 Provider
-final currentPlaylistProvider = StateProvider<List<Song>>((ref) => []);
+final currentPlaylistProvider = StreamProvider<List<Song>>((ref) {
+  final service = ref.watch(audioPlayerServiceProvider);
+  return service.playlistStream;
+});
 
 // 当前播放索引 Provider
-final currentIndexProvider = StateProvider<int>((ref) => -1);
+final currentIndexProvider = StreamProvider<int>((ref) {
+  final service = ref.watch(audioPlayerServiceProvider);
+  return service.currentIndexStream;
+});
 
 // 播放模式 Provider
-final playModeProvider = StateProvider<PlayMode>((ref) => PlayMode.sequence);
+final playModeProvider = StreamProvider<PlayMode>((ref) {
+  final service = ref.watch(audioPlayerServiceProvider);
+  return service.playModeStream;
+});

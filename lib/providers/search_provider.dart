@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/search_service.dart';
+import '../models/search_history.dart';
 import 'subsonic_provider.dart';
 
 /// 搜索服务 Provider
@@ -12,7 +13,7 @@ final searchServiceProvider = Provider<SearchService>((ref) {
 final searchResultProvider = StateProvider<SearchResult?>((ref) => null);
 
 /// 搜索历史 Provider
-final searchHistoryProvider = Provider<List<dynamic>>((ref) {
+final searchHistoryProvider = FutureProvider.autoDispose<List<SearchHistory>>((ref) async {
   final searchService = ref.watch(searchServiceProvider);
-  return searchService.getSearchHistory();
+  return await searchService.getSearchHistoryAsync();
 });

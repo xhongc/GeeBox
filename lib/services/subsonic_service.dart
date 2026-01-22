@@ -11,6 +11,7 @@ class SubsonicService {
   late String _serverUrl;
   late String _username;
   late String _password;
+  bool _isConfigured = false;
   static const String _clientName = 'Chanson';
   static const String _apiVersion = '1.16.1';
 
@@ -28,10 +29,24 @@ class SubsonicService {
     _serverUrl = serverUrl.endsWith('/') ? serverUrl.substring(0, serverUrl.length - 1) : serverUrl;
     _username = username;
     _password = password;
+    _isConfigured = true;
+  }
+
+  bool get isConfigured => _isConfigured;
+
+  bool _ensureConfigured() {
+    if (!_isConfigured) {
+      debugPrint('SubsonicService not configured');
+      return false;
+    }
+    return true;
   }
 
   /// 生成认证参数
   Map<String, dynamic> _getAuthParams() {
+    if (!_ensureConfigured()) {
+      throw StateError('SubsonicService not configured');
+    }
     final salt = DateTime.now().millisecondsSinceEpoch.toString();
     final token = md5.convert(utf8.encode(_password + salt)).toString();
 
@@ -47,6 +62,7 @@ class SubsonicService {
 
   /// 测试服务器连接
   Future<bool> ping() async {
+    if (!_ensureConfigured()) return false;
     try {
       final response = await _dio.get(
         '$_serverUrl/rest/ping',
@@ -66,6 +82,7 @@ class SubsonicService {
 
   /// 获取随机歌曲
   Future<List<Song>> getRandomSongs({int size = 10}) async {
+    if (!_ensureConfigured()) return [];
     try {
       final params = _getAuthParams();
       params['size'] = size.toString();
@@ -95,6 +112,7 @@ class SubsonicService {
     int size = 20,
     int offset = 0,
   }) async {
+    if (!_ensureConfigured()) return [];
     try {
       final params = _getAuthParams();
       params['type'] = type;
@@ -122,6 +140,7 @@ class SubsonicService {
 
   /// 获取专辑详情（包含歌曲列表）
   Future<List<Song>> getAlbum(String albumId) async {
+    if (!_ensureConfigured()) return [];
     try {
       final params = _getAuthParams();
       params['id'] = albumId;
@@ -147,6 +166,7 @@ class SubsonicService {
 
   /// 获取歌曲流媒体 URL
   String getStreamUrl(String songId) {
+    if (!_ensureConfigured()) return '';
     final params = _getAuthParams();
     params['id'] = songId;
 
@@ -159,6 +179,7 @@ class SubsonicService {
 
   /// 获取封面图片 URL
   String getCoverArtUrl(String coverArtId, {int size = 300}) {
+    if (!_ensureConfigured()) return '';
     final params = _getAuthParams();
     params['id'] = coverArtId;
     params['size'] = size.toString();
@@ -172,6 +193,7 @@ class SubsonicService {
 
   /// 搜索
   Future<Map<String, dynamic>> search(String query) async {
+    if (!_ensureConfigured()) return {'songs': [], 'albums': []};
     try {
       final params = _getAuthParams();
       params['query'] = query;
@@ -202,6 +224,7 @@ class SubsonicService {
 
   /// 获取所有播放列表
   Future<List<Map<String, dynamic>>> getPlaylists() async {
+    if (!_ensureConfigured()) return [];
     try {
       final params = _getAuthParams();
 
@@ -230,6 +253,7 @@ class SubsonicService {
 
   /// 获取播放列表详情（包含歌曲）
   Future<Map<String, dynamic>?> getPlaylist(String playlistId) async {
+    if (!_ensureConfigured()) return null;
     try {
       final params = _getAuthParams();
       params['id'] = playlistId;
@@ -257,6 +281,7 @@ class SubsonicService {
     required String name,
     String? comment,
   }) async {
+    if (!_ensureConfigured()) return null;
     try {
       final params = _getAuthParams();
       params['name'] = name;
@@ -293,6 +318,7 @@ class SubsonicService {
     String? name,
     String? comment,
   }) async {
+    if (!_ensureConfigured()) return false;
     try {
       final params = _getAuthParams();
       params['playlistId'] = playlistId;
@@ -324,6 +350,7 @@ class SubsonicService {
     required String playlistId,
     required String songId,
   }) async {
+    if (!_ensureConfigured()) return false;
     try {
       final params = _getAuthParams();
       params['playlistId'] = playlistId;
@@ -350,6 +377,7 @@ class SubsonicService {
     required String playlistId,
     required int songIndex,
   }) async {
+    if (!_ensureConfigured()) return false;
     try {
       final params = _getAuthParams();
       params['playlistId'] = playlistId;
@@ -373,6 +401,7 @@ class SubsonicService {
 
   /// 删除播放列表
   Future<bool> deletePlaylist(String playlistId) async {
+    if (!_ensureConfigured()) return false;
     try {
       final params = _getAuthParams();
       params['id'] = playlistId;
@@ -397,6 +426,7 @@ class SubsonicService {
 
   /// 获取所有艺术家（按字母索引）
   Future<List<Artist>> getArtists() async {
+    if (!_ensureConfigured()) return [];
     try {
       final params = _getAuthParams();
 
@@ -435,6 +465,7 @@ class SubsonicService {
 
   /// 获取艺术家详情（包含专辑列表）
   Future<Map<String, dynamic>?> getArtist(String artistId) async {
+    if (!_ensureConfigured()) return null;
     try {
       final params = _getAuthParams();
       params['id'] = artistId;
@@ -459,6 +490,7 @@ class SubsonicService {
 
   /// 收藏歌曲/专辑/艺术家
   Future<bool> star({String? id, String? albumId, String? artistId}) async {
+    if (!_ensureConfigured()) return false;
     try {
       final params = _getAuthParams();
       if (id != null) params['id'] = id;
@@ -483,6 +515,7 @@ class SubsonicService {
 
   /// 取消收藏歌曲/专辑/艺术家
   Future<bool> unstar({String? id, String? albumId, String? artistId}) async {
+    if (!_ensureConfigured()) return false;
     try {
       final params = _getAuthParams();
       if (id != null) params['id'] = id;
@@ -507,6 +540,7 @@ class SubsonicService {
 
   /// 获取收藏列表
   Future<List<Song>> getStarredSongs() async {
+    if (!_ensureConfigured()) return [];
     try {
       final response = await _dio.get(
         '$_serverUrl/rest/getStarred',
@@ -531,6 +565,7 @@ class SubsonicService {
 
   /// 提交播放记录（scrobble）
   Future<bool> scrobble(String id, {int? time, bool submission = true}) async {
+    if (!_ensureConfigured()) return false;
     try {
       final params = _getAuthParams();
       params['id'] = id;
@@ -559,6 +594,7 @@ class SubsonicService {
     int count = 10,
     int offset = 0,
   }) async {
+    if (!_ensureConfigured()) return [];
     try {
       final params = _getAuthParams();
       params['genre'] = genre;
@@ -588,6 +624,7 @@ class SubsonicService {
 
   /// 获取歌词
   Future<String?> getLyrics({String? artist, String? title}) async {
+    if (!_ensureConfigured()) return null;
     try {
       final params = _getAuthParams();
       if (artist != null) params['artist'] = artist;

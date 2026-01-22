@@ -8,6 +8,8 @@ import 'models/artist.dart';
 import 'models/search_history.dart';
 import 'models/playlist.dart';
 import 'providers/theme_provider.dart';
+import 'providers/subsonic_provider.dart';
+import 'services/subsonic_service.dart';
 import 'theme/app_theme.dart';
 
 void main() async {
@@ -29,9 +31,29 @@ void main() async {
   await Hive.openBox<Artist>('artists');
   await Hive.openBox<SearchHistory>('search_history');
   await Hive.openBox<Playlist>('playlists');
-  await Hive.openBox('settings');
+  final settingsBox = await Hive.openBox('settings');
 
-  runApp(const ProviderScope(child: MyApp()));
+  // 初始化 Subsonic 服务配置（如果已有保存）
+  final subsonicService = SubsonicService();
+  final serverUrl = settingsBox.get('serverUrl', defaultValue: '') as String;
+  final username = settingsBox.get('username', defaultValue: '') as String;
+  final password = settingsBox.get('password', defaultValue: '') as String;
+  if (serverUrl.isNotEmpty && username.isNotEmpty && password.isNotEmpty) {
+    subsonicService.configure(
+      serverUrl: serverUrl,
+      username: username,
+      password: password,
+    );
+  }
+
+  runApp(
+    ProviderScope(
+      overrides: [
+        subsonicServiceProvider.overrideWithValue(subsonicService),
+      ],
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends ConsumerWidget {

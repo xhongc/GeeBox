@@ -9,16 +9,19 @@ class MusicRepository {
   final Box<Song> _songsBox;
   final Box<Album> _albumsBox;
   final Box<Artist> _artistsBox;
+  final Box _settingsBox;
 
   // 缓存过期时间（24小时）
   static const Duration _cacheExpiration = Duration(hours: 24);
+  static const String _albumListCacheKey = 'album_list_cache_key';
 
   MusicRepository({
     required SubsonicService subsonicService,
   })  : _subsonicService = subsonicService,
         _songsBox = Hive.box<Song>('songs'),
         _albumsBox = Hive.box<Album>('albums'),
-        _artistsBox = Hive.box<Artist>('artists');
+        _artistsBox = Hive.box<Artist>('artists'),
+        _settingsBox = Hive.box('settings');
 
   /// 获取随机歌曲（缓存优先）
   Future<List<Song>> getRandomSongs({int size = 10, bool forceRefresh = false}) async {
@@ -51,10 +54,14 @@ class MusicRepository {
     int offset = 0,
     bool forceRefresh = false,
   }) async {
+    final cacheKey = _buildAlbumListCacheKey(type, size, offset);
     // 如果不强制刷新，先尝试从缓存获取
     if (!forceRefresh && _albumsBox.isNotEmpty) {
+      final cachedKey = _settingsBox.get(_albumListCacheKey, defaultValue: '') as String;
       final cachedAlbums = _albumsBox.values.toList();
-      if (cachedAlbums.isNotEmpty && _isCacheValid(cachedAlbums.first.cacheTime)) {
+      if (cachedKey == cacheKey &&
+          cachedAlbums.isNotEmpty &&
+          _isCacheValid(cachedAlbums.first.cacheTime)) {
         return cachedAlbums;
       }
     }
@@ -72,6 +79,7 @@ class MusicRepository {
       for (var album in albums) {
         await _albumsBox.put(album.id, album);
       }
+      await _settingsBox.put(_albumListCacheKey, cacheKey);
     }
 
     return albums;
@@ -101,6 +109,10 @@ class MusicRepository {
   bool _isCacheValid(DateTime? cacheTime) {
     if (cacheTime == null) return false;
     return DateTime.now().difference(cacheTime) < _cacheExpiration;
+  }
+
+  String _buildAlbumListCacheKey(String type, int size, int offset) {
+    return '$type:$size:$offset';
   }
 
   /// 清除所有缓存

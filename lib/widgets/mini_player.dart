@@ -21,13 +21,7 @@ class MiniPlayer extends ConsumerWidget {
     final playerState = ref.watch(playerStateProvider);
     final subsonicService = ref.watch(subsonicServiceProvider);
     final repository = ref.watch(musicRepositoryProvider);
-
-    // 直接从 service 获取当前歌曲，并监听 stream 来触发重建
-    ref.listen(currentSongProvider, (previous, next) {
-      // 这会在 stream 发送新值时触发重建
-    });
-
-    final currentSong = audioService.currentSong;
+    final currentSong = ref.watch(currentSongProvider).value;
 
     // 如果没有正在播放的歌曲，不显示迷你播放器
     if (currentSong == null) {
