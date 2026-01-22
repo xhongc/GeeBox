@@ -5,6 +5,7 @@ import '../providers/music_repository_provider.dart';
 import 'playlist_management_screen.dart';
 import 'playlist_detail_screen.dart';
 import 'artists_screen.dart';
+import 'albums_screen.dart';
 
 // 音乐库统计 Provider
 final libraryStatsProvider = FutureProvider.autoDispose<Map<String, int>>((ref) async {
@@ -210,7 +211,14 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with AutomaticKee
                           '专辑',
                           Icons.album,
                           Colors.purple,
-                          () {},
+                          () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const AlbumsScreen(),
+                              ),
+                            );
+                          },
                         ),
                       ),
                     ],

@@ -220,7 +220,8 @@ class AlbumDetailScreen extends ConsumerWidget {
     int trackNumber,
     List<Song> allSongs,
   ) {
-    final currentSong = ref.watch(currentSongProvider);
+    final currentSongAsync = ref.watch(currentSongProvider);
+    final currentSong = currentSongAsync.value;
     final isPlaying = currentSong?.id == song.id;
 
     return ListTile(

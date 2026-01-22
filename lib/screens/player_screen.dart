@@ -6,7 +6,10 @@ import '../providers/subsonic_provider.dart';
 import '../providers/music_repository_provider.dart';
 import '../providers/favorite_provider.dart';
 import '../providers/play_history_provider.dart';
+import '../providers/sleep_timer_provider.dart';
 import '../services/audio_player_service.dart';
+import '../widgets/lyrics_widget.dart';
+import 'play_queue_screen.dart';
 
 class PlayerScreen extends ConsumerStatefulWidget {
   const PlayerScreen({super.key});
@@ -31,7 +34,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final currentSong = ref.watch(currentSongProvider);
+    final currentSongAsync = ref.watch(currentSongProvider);
     final playerState = ref.watch(playerStateProvider);
     final position = ref.watch(positionProvider);
     final duration = ref.watch(durationProvider);
@@ -40,6 +43,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     final repository = ref.watch(musicRepositoryProvider);
 
     // 如果没有歌曲，返回空页面
+    final currentSong = currentSongAsync.value;
     if (currentSong == null) {
       return Scaffold(
         appBar: AppBar(
@@ -77,6 +81,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.timer),
+            onPressed: () {
+              _showSleepTimerDialog(context);
+            },
+            tooltip: '睡眠定时器',
+          ),
           IconButton(
             icon: const Icon(Icons.more_vert),
             onPressed: () {},
@@ -397,8 +408,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.devices),
-                      onPressed: () {},
+                      icon: const Icon(Icons.lyrics),
+                      onPressed: () {
+                        _showLyricsDialog(context, currentSong);
+                      },
+                      tooltip: '歌词',
                     ),
                     IconButton(
                       icon: const Icon(Icons.share),
@@ -406,7 +420,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                     ),
                     IconButton(
                       icon: const Icon(Icons.queue_music),
-                      onPressed: () {},
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const PlayQueueScreen(),
+                          ),
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -425,5 +446,133 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     final minutes = twoDigits(duration.inMinutes.remainder(60));
     final seconds = twoDigits(duration.inSeconds.remainder(60));
     return '$minutes:$seconds';
+  }
+
+  void _showLyricsDialog(BuildContext context, currentSong) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        child: Container(
+          height: MediaQuery.of(context).size.height * 0.7,
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          currentSong.title,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          currentSong.artist ?? '未知艺术家',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const Divider(),
+              Expanded(
+                child: LyricsWidget(
+                  artist: currentSong.artist,
+                  title: currentSong.title,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showSleepTimerDialog(BuildContext context) {
+    final sleepTimerService = ref.read(sleepTimerServiceProvider);
+    final isRunning = sleepTimerService.isRunning;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('睡眠定时器'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isRunning) ...[
+              Text(
+                '定时器正在运行',
+                style: TextStyle(color: Colors.grey[600]),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () {
+                  sleepTimerService.cancel();
+                  ref.read(sleepTimerStateProvider.notifier).state++;
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('已取消睡眠定时器')),
+                  );
+                },
+                child: const Text('取消定时器'),
+              ),
+              const SizedBox(height: 8),
+            ],
+            ListTile(
+              title: const Text('15 分钟'),
+              onTap: () => _setSleepTimer(context, const Duration(minutes: 15)),
+            ),
+            ListTile(
+              title: const Text('30 分钟'),
+              onTap: () => _setSleepTimer(context, const Duration(minutes: 30)),
+            ),
+            ListTile(
+              title: const Text('45 分钟'),
+              onTap: () => _setSleepTimer(context, const Duration(minutes: 45)),
+            ),
+            ListTile(
+              title: const Text('60 分钟'),
+              onTap: () => _setSleepTimer(context, const Duration(minutes: 60)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _setSleepTimer(BuildContext context, Duration duration) {
+    final sleepTimerService = ref.read(sleepTimerServiceProvider);
+    final audioService = ref.read(audioPlayerServiceProvider);
+
+    sleepTimerService.setTimer(duration, () {
+      // 定时器结束时停止播放
+      audioService.stop();
+      ref.read(sleepTimerStateProvider.notifier).state++;
+    });
+
+    ref.read(sleepTimerStateProvider.notifier).state++;
+    Navigator.pop(context);
+
+    final minutes = duration.inMinutes;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('已设置 $minutes 分钟后停止播放')),
+    );
   }
 }

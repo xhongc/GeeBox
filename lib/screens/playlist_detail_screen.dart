@@ -202,7 +202,6 @@ class PlaylistDetailScreen extends ConsumerWidget {
     audioService.setPlaylist(songs, initialIndex: 0);
     final streamUrl = subsonicService.getStreamUrl(songs[0].id);
     audioService.playSong(songs[0], streamUrl);
-    ref.read(currentSongProvider.notifier).state = songs[0];
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('开始播放 ${songs.length} 首歌曲')),
@@ -219,7 +218,6 @@ class PlaylistDetailScreen extends ConsumerWidget {
     audioService.setPlaylist(shuffledSongs, initialIndex: 0);
     final streamUrl = subsonicService.getStreamUrl(shuffledSongs[0].id);
     audioService.playSong(shuffledSongs[0], streamUrl);
-    ref.read(currentSongProvider.notifier).state = shuffledSongs[0];
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('随机播放模式')),
@@ -232,7 +230,6 @@ class PlaylistDetailScreen extends ConsumerWidget {
     final streamUrl = subsonicService.getStreamUrl(song.id);
 
     audioService.playSong(song, streamUrl);
-    ref.read(currentSongProvider.notifier).state = song;
   }
 
   void _showPlaylistOptions(BuildContext context, WidgetRef ref, playlist) {

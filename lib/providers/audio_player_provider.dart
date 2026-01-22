@@ -8,8 +8,11 @@ final audioPlayerServiceProvider = Provider<AudioPlayerService>((ref) {
   return AudioPlayerService();
 });
 
-// 当前播放歌曲 Provider
-final currentSongProvider = StateProvider<Song?>((ref) => null);
+// 当前播放歌曲 Provider - 从 AudioPlayerService 的 stream 获取
+final currentSongProvider = StreamProvider<Song?>((ref) {
+  final service = ref.watch(audioPlayerServiceProvider);
+  return service.currentSongStream;
+});
 
 // 播放状态 Provider
 final playerStateProvider = StreamProvider<PlayerState>((ref) {

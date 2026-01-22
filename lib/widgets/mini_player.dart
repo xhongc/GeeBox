@@ -17,13 +17,14 @@ class MiniPlayer extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final currentSong = ref.watch(currentSongProvider);
+    final currentSongAsync = ref.watch(currentSongProvider);
     final playerState = ref.watch(playerStateProvider);
     final audioService = ref.watch(audioPlayerServiceProvider);
     final subsonicService = ref.watch(subsonicServiceProvider);
     final repository = ref.watch(musicRepositoryProvider);
 
     // 如果没有正在播放的歌曲，不显示迷你播放器
+    final currentSong = currentSongAsync.value;
     if (currentSong == null) {
       return const SizedBox.shrink();
     }

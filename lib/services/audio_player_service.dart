@@ -18,6 +18,7 @@ class AudioPlayerService {
   List<Song> _playlist = [];
   int _currentIndex = -1;
   PlayMode _playMode = PlayMode.sequence;
+  Song? _currentSong; // 独立维护当前歌曲
 
   // Scrobble 相关
   bool _hasScrobbled = false;
@@ -29,14 +30,28 @@ class AudioPlayerService {
   List<Song> get playlist => _playlist;
   int get currentIndex => _currentIndex;
   PlayMode get playMode => _playMode;
-  Song? get currentSong => _currentIndex >= 0 && _currentIndex < _playlist.length
-      ? _playlist[_currentIndex]
-      : null;
+  Song? get currentSong => _currentSong;
 
   // 播放状态流
   Stream<PlayerState> get playerStateStream => _player.playerStateStream;
   Stream<Duration> get positionStream => _player.positionStream;
   Stream<Duration?> get durationStream => _player.durationStream;
+
+  // 当前歌曲流 - 用于通知 UI 更新
+  final _currentSongController = StreamController<Song?>.broadcast();
+  Stream<Song?> get currentSongStream {
+    // 创建一个新的 stream，在订阅时立即发送当前值
+    return Stream.multi((controller) {
+      // 立即发送当前值
+      controller.add(_currentSong);
+      // 然后监听后续的变化
+      final subscription = _currentSongController.stream.listen(
+        (song) => controller.add(song),
+        onError: (error) => controller.addError(error),
+      );
+      controller.onCancel = () => subscription.cancel();
+    });
+  }
 
   /// 设置 scrobble 回调函数
   void setScrobbleCallback(Function(String) callback) {
@@ -88,6 +103,9 @@ class AudioPlayerService {
   /// 播放指定歌曲
   Future<void> playSong(Song song, String streamUrl) async {
     try {
+      // 更新当前歌曲
+      _currentSong = song;
+
       // 重置 scrobble 标记
       _hasScrobbled = false;
 
@@ -96,6 +114,9 @@ class AudioPlayerService {
 
       await _player.setUrl(streamUrl);
       await _player.play();
+
+      // 通知当前歌曲变化
+      _currentSongController.add(song);
 
       // 监听播放进度，30秒后提交 scrobble
       _positionSubscription = _player.positionStream.listen((position) {
@@ -117,6 +138,9 @@ class AudioPlayerService {
     final song = _playlist[index];
     final streamUrl = getStreamUrl(song.id);
     await playSong(song, streamUrl);
+
+    // 通知当前歌曲变化（playSong 中已经发送，这里是为了确保）
+    _currentSongController.add(song);
   }
 
   /// 播放/暂停
@@ -150,11 +174,68 @@ class AudioPlayerService {
   /// 停止播放
   Future<void> stop() async {
     await _player.stop();
+    _currentSong = null;
+    _currentSongController.add(null);
   }
 
   /// 释放资源
   Future<void> dispose() async {
     _positionSubscription?.cancel();
+    await _currentSongController.close();
     await _player.dispose();
+  }
+
+  /// 添加歌曲到队列末尾
+  void addToQueue(Song song) {
+    _playlist.add(song);
+  }
+
+  /// 添加多首歌曲到队列
+  void addAllToQueue(List<Song> songs) {
+    _playlist.addAll(songs);
+  }
+
+  /// 从队列中移除指定索引的歌曲
+  void removeFromQueue(int index) {
+    if (index < 0 || index >= _playlist.length) return;
+
+    // 如果删除的是当前播放的歌曲之前的歌曲，需要调整当前索引
+    if (index < _currentIndex) {
+      _currentIndex--;
+    }
+    // 如果删除的是当前播放的歌曲，停止播放
+    else if (index == _currentIndex) {
+      stop();
+      _currentIndex = -1;
+    }
+
+    _playlist.removeAt(index);
+  }
+
+  /// 清空播放队列
+  void clearQueue() {
+    stop();
+    _playlist.clear();
+    _currentIndex = -1;
+    _currentSong = null;
+    _currentSongController.add(null);
+  }
+
+  /// 移动队列中的歌曲位置
+  void moveInQueue(int oldIndex, int newIndex) {
+    if (oldIndex < 0 || oldIndex >= _playlist.length) return;
+    if (newIndex < 0 || newIndex >= _playlist.length) return;
+
+    final song = _playlist.removeAt(oldIndex);
+    _playlist.insert(newIndex, song);
+
+    // 调整当前播放索引
+    if (oldIndex == _currentIndex) {
+      _currentIndex = newIndex;
+    } else if (oldIndex < _currentIndex && newIndex >= _currentIndex) {
+      _currentIndex--;
+    } else if (oldIndex > _currentIndex && newIndex <= _currentIndex) {
+      _currentIndex++;
+    }
   }
 }

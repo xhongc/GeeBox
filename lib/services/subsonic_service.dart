@@ -584,4 +584,35 @@ class SubsonicService {
       return [];
     }
   }
+
+  /// 获取歌词
+  Future<String?> getLyrics({String? artist, String? title}) async {
+    try {
+      final params = _getAuthParams();
+      if (artist != null) params['artist'] = artist;
+      if (title != null) params['title'] = title;
+
+      final response = await _dio.get(
+        '$_serverUrl/rest/getLyrics',
+        queryParameters: params,
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data['subsonic-response'];
+        if (data['status'] == 'ok' && data['lyrics'] != null) {
+          // 歌词内容在 lyrics 节点的文本中
+          final lyrics = data['lyrics'];
+          if (lyrics is Map && lyrics['value'] != null) {
+            return lyrics['value'] as String;
+          } else if (lyrics is String) {
+            return lyrics;
+          }
+        }
+      }
+      return null;
+    } catch (e) {
+      print('Get lyrics error: $e');
+      return null;
+    }
+  }
 }

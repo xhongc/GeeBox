@@ -125,7 +125,6 @@ class FavoritesScreen extends ConsumerWidget {
         final subsonicService = ref.read(subsonicServiceProvider);
         final streamUrl = subsonicService.getStreamUrl(song.id);
         audioService.playSong(song, streamUrl);
-        ref.read(currentSongProvider.notifier).state = song;
       },
     );
   }
