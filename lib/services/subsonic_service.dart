@@ -8,9 +8,9 @@ import '../models/artist.dart';
 
 class SubsonicService {
   final Dio _dio;
-  late String _serverUrl;
-  late String _username;
-  late String _password;
+  String _serverUrl = '';
+  String _username = '';
+  String _password = '';
   bool _isConfigured = false;
   static const String _clientName = 'Chanson';
   static const String _apiVersion = '1.16.1';

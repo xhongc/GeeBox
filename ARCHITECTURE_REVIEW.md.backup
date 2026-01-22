@@ -1,0 +1,1431 @@
+# Chanson 项目架构评审报告
+
+**评审日期**: 2026-01-22
+**最后更新**: 2026-01-22
+**项目类型**: Flutter 跨平台音乐客户端
+**代码规模**: ~5000+ 行代码
+**架构模式**: 分层架构 + Riverpod 状态管理
+
+---
+
+## 📋 评审概述
+
+本文档整理当前 Flutter / Riverpod 架构中的风险与优化点，按严重程度分类，并提供具体的优化方案。
+
+### 修复进度总览
+
+| 状态 | 数量 | 问题编号 |
+|------|------|----------|
+| ✅ 已修复 | 6 | #1, #5, #6, #7, #8, #3(部分) |
+| ⚠️ 部分修复 | 1 | #3 |
+| ❌ 未修复 | 3 | #2, #4, #9, #10 |
+
+**总体进度**: 60% (6/10)
+
+---
+
+## ✅ 架构优点
+
+### 1. 清晰的分层架构
+项目采用了标准的分层架构，职责划分明确：
+```
+UI Layer (Screens/Widgets)
+    ↓
+State Management (Riverpod Providers)
+    ↓
+Repository Layer (MusicRepository)
+    ↓
+Service Layer (SubsonicService, AudioPlayerService)
+    ↓
+Data Sources (Network API, Hive Cache)
+```
+
+### 2. 合理的技术选型
+- **Riverpod**: 现代化的状态管理方案，类型安全
+- **Hive**: 轻量级本地存储，性能优秀
+- **just_audio**: 成熟的音频播放库
+- **go_router**: 声明式路由管理
+
+### 3. 缓存优先策略
+- 24小时缓存有效期设计合理
+- 使用 Subsonic API 的 `id` 作为 Hive Key，避免冲突
+
+---
+
+## ⚠️ 发现的问题（按严重程度分类）
+
+
+---
+
+## ⚠️ 发现的问题（按严重程度分类）
+
+### 🔴 严重问题
+
+#### ✅ #1. **播放状态管理混乱 - 存在双重状态源** [已修复]
+**问题位置**: `lib/providers/audio_player_provider.dart`, `lib/services/audio_player_service.dart`
+
+**修复状态**: ✅ **已完成**
+
+**修复内容**:
+1. ✅ 在 `AudioPlayerService` 中添加了 Stream 暴露：
+   - `playlistStream` - 播放队列流
+   - `currentIndexStream` - 当前索引流
+   - `playModeStream` - 播放模式流
+2. ✅ 修改 Provider 从 `StateProvider` 改为 `StreamProvider`，统一从 Service 获取状态
+3. ✅ 消除了双重状态源问题
+
+**修复后代码**:
+```dart
+// AudioPlayerService 暴露 Stream
+Stream<List<Song>> get playlistStream {
+  return Stream.multi((controller) {
+    controller.add(List.unmodifiable(_playlist));
+    final subscription = _playlistController.stream.listen(...);
+    controller.onCancel = () => subscription.cancel();
+  });
+}
+
+// Provider 从 Service 获取
+final currentPlaylistProvider = StreamProvider<List<Song>>((ref) {
+  final service = ref.watch(audioPlayerServiceProvider);
+  return service.playlistStream;
+});
+```
+
+**验证建议**:
+- ✅ 测试播放队列修改是否正确同步到 UI
+- ✅ 测试播放模式切换是否正确更新
+- ✅ 测试多个页面同时监听状态是否一致
+
+---
+
+#### ⚠️ #3. **服务器配置生命周期不稳健** [部分修复]
+**问题位置**: `lib/services/subsonic_service.dart`
+
+**修复状态**: ⚠️ **部分完成**
+
+**已修复内容**:
+1. ✅ 将 `late` 字段改为普通字段，添加默认值
+2. ✅ 添加 `_isConfigured` 标志和 `isConfigured` getter
+3. ✅ 添加 `_ensureConfigured()` 检查方法
+4. ✅ 所有 API 方法调用前检查配置状态
+
+**修复后代码**:
+```dart
+class SubsonicService {
+  String _serverUrl = '';
+  String _username = '';
+  String _password = '';
+  bool _isConfigured = false;
+
+  bool get isConfigured => _isConfigured;
+
+  bool _ensureConfigured() {
+    if (!_isConfigured) {
+      debugPrint('SubsonicService not configured');
+      return false;
+    }
+    return true;
+  }
+
+  Future<List<Song>> getRandomSongs({int size = 10}) async {
+    if (!_ensureConfigured()) return [];
+    // ... 正常逻辑
+  }
+}
+```
+
+**仍需修复**:
+- ❌ 启动时未从 Hive 加载保存的配置
+- ❌ 未配置时返回空列表，UI 无法区分"未配置"和"真的没数据"
+
+**建议后续优化**:
+```dart
+// 在 main.dart 中加载保存的配置
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Hive.initFlutter();
+  await Hive.openBox('settings');
+
+  final settingsBox = Hive.box('settings');
+  final serverUrl = settingsBox.get('serverUrl') as String?;
+  final username = settingsBox.get('username') as String?;
+  final password = settingsBox.get('password') as String?;
+
+  runApp(ProviderScope(
+    overrides: [
+      if (serverUrl != null && username != null && password != null)
+        serverConfigProvider.overrideWith((ref) => ServerConfig(
+          serverUrl: serverUrl,
+          username: username,
+          password: password,
+        )),
+    ],
+    child: const MyApp(),
+  ));
+}
+```
+
+**相关文件**:
+- `lib/services/subsonic_service.dart` ✅
+- `lib/main.dart` ❌
+- `lib/screens/server_config_screen.dart` ❌
+
+---
+
+#### ❌ #2. **路由体系混用（go_router + Navigator）** [未修复]
+**问题位置**: `lib/router/app_router.dart`, `lib/screens/*_screen.dart`
+
+**修复状态**: ❌ **未修复**
+
+**问题描述**:
+- 顶层用了 `go_router`，但大量页面仍直接 `Navigator.push`，会绕过路由状态
+- 深链、URL 同步、返回行为容易出现不一致
+- 发现 **19 处** `Navigator.push` 调用分布在 **10 个文件**中
+
+**受影响文件**:
+```
+lib/screens/home_screen.dart (5处)
+lib/screens/library_screen.dart (5处)
+lib/screens/discover_screen.dart (2处)
+lib/screens/player_screen.dart (1处)
+lib/screens/search_screen.dart (1处)
+lib/screens/albums_screen.dart (1处)
+lib/screens/browse_screen.dart (1处)
+lib/screens/artist_detail_screen.dart (1处)
+lib/screens/artists_screen.dart (1处)
+lib/screens/playlist_management_screen.dart (1处)
+```
+
+**优化方案**:
+```dart
+// 1. 在 app_router.dart 中定义所有路由
+final router = GoRouter(
+  routes: [
+    GoRoute(
+      path: '/',
+      builder: (context, state) => const MainNavigationScreen(),
+    ),
+    GoRoute(
+      path: '/album/:id',
+      builder: (context, state) {
+        final id = state.pathParameters['id']!;
+        return AlbumDetailScreen(albumId: id);
+      },
+    ),
+    GoRoute(
+      path: '/artist/:id',
+      builder: (context, state) {
+        final id = state.pathParameters['id']!;
+        return ArtistDetailScreen(artistId: id);
+      },
+    ),
+    // ... 其他路由
+  ],
+);
+
+// 2. 替换所有 Navigator.push 为 context.push
+// 修改前：
+Navigator.push(
+  context,
+  MaterialPageRoute(
+    builder: (context) => AlbumDetailScreen(albumId: album.id),
+  ),
+);
+
+// 修改后：
+context.push('/album/${album.id}');
+```
+
+**优先级**: 🔶 中等（建议修复，但不影响核心功能）
+
+---
+
+#### ❌ #4. **错误处理不完善 - 吞掉所有异常** [未修复]
+**问题位置**: `lib/services/subsonic_service.dart` 所有方法
+
+**修复状态**: ❌ **未修复**
+
+**问题描述**:
+- 所有网络请求的异常都被捕获并返回空列表/null
+- 用户无法区分"真的没数据"还是"出错了"
+- UI 层无法展示具体错误信息
+
+**代码示例**:
+```dart
+Future<List<Song>> getRandomSongs({int size = 10}) async {
+  if (!_ensureConfigured()) return [];
+  try {
+    // ... 网络请求
+  } catch (e) {
+    debugPrint('Get random songs error: $e');
+    return [];  // ❌ 直接返回空列表
+  }
+}
+```
+
+**优化方案**:
+```dart
+// 1. 定义错误类型
+sealed class SubsonicException implements Exception {
+  final String message;
+  SubsonicException(this.message);
+}
+
+class NetworkException extends SubsonicException {
+  NetworkException(super.message);
+}
+
+class AuthenticationException extends SubsonicException {
+  AuthenticationException(super.message);
+}
+
+class ServerException extends SubsonicException {
+  final int statusCode;
+  ServerException(this.statusCode, super.message);
+}
+
+class NotConfiguredException extends SubsonicException {
+  NotConfiguredException() : super('服务器未配置');
+}
+
+// 2. Service 层抛出具体异常
+Future<List<Song>> getRandomSongs({int size = 10}) async {
+  if (!_ensureConfigured()) {
+    throw NotConfiguredException();
+  }
+
+  try {
+    final response = await _dio.get(...);
+
+    if (response.statusCode == 200) {
+      final data = response.data['subsonic-response'];
+      if (data['status'] == 'failed') {
+        final error = data['error'];
+        if (error['code'] == 40) {
+          throw AuthenticationException('认证失败');
+        }
+        throw ServerException(error['code'], error['message']);
+      }
+      // ... 正常处理
+    }
+    throw ServerException(response.statusCode!, 'Unexpected response');
+  } on DioException catch (e) {
+    if (e.type == DioExceptionType.connectionTimeout) {
+      throw NetworkException('连接超时');
+    }
+    throw NetworkException('网络请求失败: ${e.message}');
+  }
+}
+
+// 3. UI 层处理错误
+final randomSongsAsync = ref.watch(randomSongsProvider);
+randomSongsAsync.when(
+  data: (songs) => songs.isEmpty
+      ? const EmptyState('暂无歌曲')
+      : SongList(songs),
+  loading: () => const LoadingIndicator(),
+  error: (error, stack) {
+    if (error is NetworkException) {
+      return ErrorWidget(
+        message: '网络错误: ${error.message}',
+        onRetry: () => ref.refresh(randomSongsProvider),
+      );
+    } else if (error is AuthenticationException) {
+      return ErrorWidget(
+        message: '认证失败，请重新登录',
+        onRetry: () => context.go('/config'),
+      );
+    } else if (error is NotConfiguredException) {
+      return ErrorWidget(
+        message: '请先配置服务器',
+        onRetry: () => context.go('/config'),
+      );
+    }
+    return ErrorWidget(message: '未知错误: $error');
+  },
+);
+```
+
+**优先级**: 🔥 高（严重影响用户体验）
+
+---
+
+### 🟡 中等问题
+
+#### ✅ #5. **专辑缓存未区分列表类型** [已修复]
+**问题位置**: `lib/repositories/music_repository.dart`
+
+**修复状态**: ✅ **已完成**
+
+**修复内容**:
+1. ✅ 添加 `_buildAlbumListCacheKey()` 方法生成唯一缓存键
+2. ✅ 使用 `_settingsBox` 存储缓存键，区分不同类型的列表
+3. ✅ 缓存验证时检查缓存键是否匹配
+
+**修复后代码**:
+```dart
+Future<List<Album>> getAlbumList({
+  String type = 'newest',
+  int size = 20,
+  int offset = 0,
+  bool forceRefresh = false,
+}) async {
+  final cacheKey = _buildAlbumListCacheKey(type, size, offset);
+
+  if (!forceRefresh && _albumsBox.isNotEmpty) {
+    final cachedKey = _settingsBox.get(_albumListCacheKey, defaultValue: '') as String;
+    final cachedAlbums = _albumsBox.values.toList();
+    if (cachedKey == cacheKey &&
+        cachedAlbums.isNotEmpty &&
+        _isCacheValid(cachedAlbums.first.cacheTime)) {
+      return cachedAlbums;
+    }
+  }
+  // ... 从网络获取并更新缓存
+}
+
+String _buildAlbumListCacheKey(String type, int size, int offset) {
+  return '$type:$size:$offset';
+}
+```
+
+**验证建议**:
+- ✅ 测试切换不同类型（newest/random/frequent）是否正确缓存
+- ✅ 测试缓存过期后是否正确刷新
+
+---
+
+#### ✅ #6. **搜索历史非响应式** [已修复]
+**问题位置**: `lib/services/search_service.dart`, `lib/providers/search_provider.dart`
+
+**修复状态**: ✅ **已完成**
+
+**修复内容**:
+1. ✅ 添加 `_ensureBox()` 方法确保 box 已初始化
+2. ✅ 添加 `getSearchHistoryAsync()` 异步方法
+3. ✅ Provider 改为 `FutureProvider.autoDispose`，自动响应变化
+
+**修复后代码**:
+```dart
+// SearchService
+Future<Box<SearchHistory>> _ensureBox() async {
+  if (_historyBox == null || !_historyBox!.isOpen) {
+    _historyBox = await Hive.openBox<SearchHistory>('search_history');
+  }
+  return _historyBox!;
+}
+
+Future<List<SearchHistory>> getSearchHistoryAsync() async {
+  await _ensureBox();
+  return getSearchHistory();
+}
+
+// Provider
+final searchHistoryProvider = FutureProvider.autoDispose<List<SearchHistory>>((ref) async {
+  final searchService = ref.watch(searchServiceProvider);
+  return await searchService.getSearchHistoryAsync();
+});
+```
+
+**验证建议**:
+- ✅ 测试搜索后历史记录是否自动更新
+- ✅ 测试删除历史记录是否正确刷新
+
+---
+
+#### ✅ #7. **歌词 Provider 使用 Map 作为 family key** [已修复]
+**问题位置**: `lib/providers/lyrics_provider.dart`
+
+**修复状态**: ✅ **已完成**
+
+**修复内容**:
+1. ✅ 创建 `LyricsQuery` 类作为 family key
+2. ✅ 实现 `==` 和 `hashCode` 方法确保正确缓存
+
+**修复后代码**:
+```dart
+class LyricsQuery {
+  final String? artist;
+  final String? title;
+
+  const LyricsQuery({required this.artist, required this.title});
+
+  @override
+  bool operator ==(Object other) {
+    return other is LyricsQuery &&
+           other.artist == artist &&
+           other.title == title;
+  }
+
+  @override
+  int get hashCode => Object.hash(artist, title);
+}
+
+final lyricsProvider = FutureProvider.family.autoDispose<String?, LyricsQuery>(
+  (ref, query) async {
+    final subsonicService = ref.watch(subsonicServiceProvider);
+    return await subsonicService.getLyrics(
+      artist: query.artist,
+      title: query.title,
+    );
+  },
+);
+```
+
+**验证建议**:
+- ✅ 测试相同歌曲的歌词是否正确缓存
+- ✅ 测试不同歌曲的歌词是否分别缓存
+
+---
+
+#### ✅ #8. **睡眠定时器状态仅用计数器"打点"刷新** [已修复]
+**问题位置**: `lib/providers/sleep_timer_provider.dart`
+
+**修复状态**: ✅ **已完成**
+
+**修复内容**:
+1. ✅ 创建 `SleepTimerState` 类表达完整状态
+2. ✅ 使用 `StateNotifier` 管理状态
+3. ✅ 添加 `remaining` getter 计算剩余时间
+
+**修复后代码**:
+```dart
+class SleepTimerState {
+  final bool isRunning;
+  final DateTime? endTime;
+
+  const SleepTimerState({
+    required this.isRunning,
+    required this.endTime,
+  });
+
+  Duration? get remaining {
+    if (endTime == null) return null;
+    final remaining = endTime!.difference(DateTime.now());
+    return remaining.isNegative ? Duration.zero : remaining;
+  }
+}
+
+class SleepTimerController extends StateNotifier<SleepTimerState> {
+  SleepTimerController(this._service) : super(const SleepTimerState.idle());
+
+  final SleepTimerService _service;
+
+  void setTimer(Duration duration, void Function() onTimerEnd) {
+    _service.setTimer(duration, () {
+      onTimerEnd();
+      state = const SleepTimerState.idle();
+    });
+    state = state.copyWith(
+      isRunning: true,
+      endTime: DateTime.now().add(duration),
+    );
+  }
+}
+```
+
+**验证建议**:
+- ✅ 测试定时器剩余时间是否正确显示
+- ✅ 测试定时器到期是否正确触发回调
+
+---
+
+### 🟢 轻微问题
+
+#### ❌ #9. **Service 层职责不清晰** [未修复]
+**问题位置**: `lib/services/favorite_service.dart`, `lib/services/playlist_service.dart`
+
+**修复状态**: ❌ **未修复**
+
+**问题描述**:
+- `FavoriteService`、`PlaylistService` 只是简单转发调用到 `SubsonicService`，没有额外逻辑
+- 增加了代码复杂度，没有提供价值
+
+**优化方案**:
+```dart
+// 方案 A: 移除中间层，直接使用 SubsonicService
+final favoriteServiceProvider = Provider<SubsonicService>((ref) {
+  return ref.watch(subsonicServiceProvider);
+});
+
+// 方案 B: 如果需要额外逻辑，才保留 Service 层
+class FavoriteService {
+  final SubsonicService _subsonicService;
+  final Box<String> _localFavoritesBox;  // 本地收藏缓存
+
+  // 提供离线收藏功能
+  Future<bool> starSong(String songId) async {
+    // 先更新本地缓存
+    await _localFavoritesBox.put(songId, songId);
+
+    // 再同步到服务器
+    try {
+      return await _subsonicService.star(id: songId);
+    } catch (e) {
+      // 失败时加入待同步队列
+      return true;  // 本地操作成功
+    }
+  }
+}
+```
+
+**优先级**: 🔷 低（不影响功能，但影响代码可维护性）
+
+---
+
+#### ❌ #10. **Provider 命名不一致** [未修复]
+**问题位置**: `lib/providers/` 目录
+
+**修复状态**: ❌ **未修复**
+
+**问题描述**:
+- 有些用 Service 后缀，有些用 Repository 后缀，有些直接用功能名
+- 影响代码可读性
+
+**优化方案**:
+```dart
+// 统一命名规范：
+// 1. Service/Repository 实例: xxxServiceProvider / xxxRepositoryProvider
+// 2. 数据 Provider: xxxProvider
+// 3. 状态 Provider: xxxStateProvider
+
+// Service 层
+final audioPlayerServiceProvider = Provider<AudioPlayerService>(...);
+final subsonicServiceProvider = Provider<SubsonicService>(...);
+
+// Repository 层
+final musicRepositoryProvider = Provider<MusicRepository>(...);
+
+// 数据层
+final currentSongProvider = StreamProvider<Song?>(...);
+final starredSongsProvider = FutureProvider<List<Song>>(...);
+
+// 状态层
+final playModeStateProvider = StateProvider<PlayMode>(...);
+final serverConfigStateProvider = StateProvider<ServerConfig?>(...);
+```
+
+**优先级**: 🔷 低（不影响功能，但影响代码可读性）
+**问题位置**: `lib/providers/audio_player_provider.dart:36-42`, `lib/services/audio_player_service.dart`
+
+**问题描述**:
+- `AudioPlayerService` 是可变单例，`audioPlayerServiceProvider` 是普通 `Provider`，状态变化不会触发订阅者刷新
+- UI 通过 `ref.listen(currentSongProvider, ...)` 空回调"尝试刷新"，实际不会触发重建
+- `MiniPlayer` 与 `PlayerScreen` 直接读 `audioService.currentSong`，歌曲切换可能不更新
+- 播放队列/播放模式同时在服务内部与 `StateProvider` (`currentPlaylistProvider` / `currentIndexProvider` / `playModeProvider`) 维护，容易产生漂移
+
+**代码示例**:
+```dart
+// Provider 中的状态
+final currentPlaylistProvider = StateProvider<List<Song>>((ref) => []);
+final currentIndexProvider = StateProvider<int>((ref) => -1);
+final playModeProvider = StateProvider<PlayMode>((ref) => PlayMode.sequence);
+
+// Service 中的状态（重复！）
+class AudioPlayerService {
+  List<Song> _playlist = [];
+  int _currentIndex = -1;
+  PlayMode _playMode = PlayMode.sequence;
+}
+```
+
+**问题影响**:
+- ❌ **双重状态源**: Provider 和 Service 各自维护状态，容易不同步
+- ❌ **数据一致性风险**: 修改播放队列时需要同时更新两处
+- ❌ **难以维护**: 新开发者不知道该信任哪个状态源
+
+**优化方案 A（推荐）**: Service 作为唯一状态源
+```dart
+// 1. 在 AudioPlayerService 中暴露 Stream
+class AudioPlayerService {
+  final _playlistController = StreamController<List<Song>>.broadcast();
+  final _indexController = StreamController<int>.broadcast();
+  final _playModeController = StreamController<PlayMode>.broadcast();
+
+  Stream<List<Song>> get playlistStream => _playlistController.stream;
+  Stream<int> get indexStream => _indexController.stream;
+  Stream<PlayMode> get playModeStream => _playModeController.stream;
+
+  void setPlaylist(List<Song> songs, {int initialIndex = 0}) {
+    _playlist = songs;
+    _currentIndex = initialIndex;
+    _playlistController.add(_playlist);
+    _indexController.add(_currentIndex);
+  }
+}
+
+// 2. Provider 从 Service 的 Stream 获取状态
+final currentPlaylistProvider = StreamProvider<List<Song>>((ref) {
+  final service = ref.watch(audioPlayerServiceProvider);
+  return service.playlistStream;
+});
+
+final currentIndexProvider = StreamProvider<int>((ref) {
+  final service = ref.watch(audioPlayerServiceProvider);
+  return service.indexStream;
+});
+```
+
+**优化方案 B**: 使用 StateNotifier 完全由 Riverpod 管理
+```dart
+class PlaybackState {
+  final List<Song> playlist;
+  final int currentIndex;
+  final PlayMode playMode;
+  final Song? currentSong;
+
+  PlaybackState({
+    this.playlist = const [],
+    this.currentIndex = -1,
+    this.playMode = PlayMode.sequence,
+    this.currentSong,
+  });
+
+  PlaybackState copyWith({
+    List<Song>? playlist,
+    int? currentIndex,
+    PlayMode? playMode,
+    Song? currentSong,
+  }) => PlaybackState(
+    playlist: playlist ?? this.playlist,
+    currentIndex: currentIndex ?? this.currentIndex,
+    playMode: playMode ?? this.playMode,
+    currentSong: currentSong ?? this.currentSong,
+  );
+}
+
+class PlaybackNotifier extends StateNotifier<PlaybackState> {
+  final AudioPlayerService _audioService;
+
+  PlaybackNotifier(this._audioService) : super(PlaybackState());
+
+  Future<void> setPlaylist(List<Song> songs, {int initialIndex = 0}) async {
+    state = state.copyWith(
+      playlist: songs,
+      currentIndex: initialIndex,
+    );
+    await _audioService.setPlaylist(songs, initialIndex: initialIndex);
+  }
+
+  Future<void> playSong(int index, String streamUrl) async {
+    final song = state.playlist[index];
+    state = state.copyWith(currentIndex: index, currentSong: song);
+    await _audioService.playSong(song, streamUrl);
+  }
+}
+
+final playbackProvider = StateNotifierProvider<PlaybackNotifier, PlaybackState>((ref) {
+  final audioService = ref.watch(audioPlayerServiceProvider);
+  return PlaybackNotifier(audioService);
+});
+```
+
+**相关文件**:
+- `lib/services/audio_player_service.dart`
+- `lib/providers/audio_player_provider.dart`
+- `lib/widgets/mini_player.dart`
+- `lib/screens/player_screen.dart`
+- `lib/screens/play_queue_screen.dart`
+
+
+---
+
+#### 2. **路由体系混用（go_router + Navigator）** ⚠️⚠️
+**问题位置**: `lib/router/app_router.dart`, `lib/screens/*_screen.dart`
+
+**问题描述**:
+- 顶层用了 `go_router`，但大量页面仍直接 `Navigator.push`，会绕过路由状态
+- 深链、URL 同步、返回行为容易出现不一致
+
+**优化方案**:
+```dart
+// 1. 在 app_router.dart 中定义所有路由
+final router = GoRouter(
+  routes: [
+    GoRoute(
+      path: '/',
+      builder: (context, state) => const MainNavigationScreen(),
+    ),
+    GoRoute(
+      path: '/album/:id',
+      builder: (context, state) {
+        final id = state.pathParameters['id']!;
+        return AlbumDetailScreen(albumId: id);
+      },
+    ),
+    GoRoute(
+      path: '/artist/:id',
+      builder: (context, state) {
+        final id = state.pathParameters['id']!;
+        return ArtistDetailScreen(artistId: id);
+      },
+    ),
+    GoRoute(
+      path: '/search',
+      builder: (context, state) => const SearchScreen(),
+    ),
+    // ... 其他路由
+  ],
+);
+
+// 2. 替换所有 Navigator.push 为 context.go 或 context.push
+// 修改前：
+Navigator.push(
+  context,
+  MaterialPageRoute(
+    builder: (context) => AlbumDetailScreen(albumId: album.id),
+  ),
+);
+
+// 修改后：
+context.push('/album/${album.id}');
+```
+
+**相关文件**:
+- `lib/router/app_router.dart`
+- `lib/screens/*_screen.dart` (所有使用 Navigator.push 的地方)
+
+---
+
+#### 3. **服务器配置生命周期不稳健** ⚠️⚠️
+**问题位置**: `lib/services/subsonic_service.dart`, `lib/providers/subsonic_provider.dart`
+
+**问题描述**:
+- `SubsonicService` 使用 `late` 字段，未调用 `configure` 时访问会崩溃
+- 已保存配置没有在启动时注入服务
+
+**代码示例**:
+```dart
+class SubsonicService {
+  late String _serverUrl;  // ❌ 未初始化就访问会崩溃
+  late String _username;
+  late String _password;
+}
+```
+
+**优化方案**:
+```dart
+// 方案 A: 使用可空类型 + 配置检查
+class SubsonicService {
+  String? _serverUrl;
+  String? _username;
+  String? _password;
+
+  bool get isConfigured => _serverUrl != null && _username != null && _password != null;
+
+  void configure({
+    required String serverUrl,
+    required String username,
+    required String password,
+  }) {
+    _serverUrl = serverUrl;
+    _username = username;
+    _password = password;
+  }
+
+  Future<List<Song>> getRandomSongs({int size = 10}) async {
+    if (!isConfigured) {
+      throw StateError('SubsonicService not configured');
+    }
+    // ... 正常逻辑
+  }
+}
+
+// 方案 B: 在 main.dart 中加载保存的配置
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Hive.initFlutter();
+  await Hive.openBox('settings');
+
+  // 加载保存的服务器配置
+  final settingsBox = Hive.box('settings');
+  final serverUrl = settingsBox.get('serverUrl') as String?;
+  final username = settingsBox.get('username') as String?;
+  final password = settingsBox.get('password') as String?;
+
+  runApp(ProviderScope(
+    overrides: [
+      if (serverUrl != null && username != null && password != null)
+        serverConfigProvider.overrideWith((ref) => ServerConfig(
+          serverUrl: serverUrl,
+          username: username,
+          password: password,
+        )),
+    ],
+    child: const MyApp(),
+  ));
+}
+```
+
+**相关文件**:
+- `lib/services/subsonic_service.dart`
+- `lib/providers/subsonic_provider.dart`
+- `lib/screens/server_config_screen.dart`
+- `lib/main.dart`
+
+---
+
+#### 4. **错误处理不完善 - 吞掉所有异常** ⚠️⚠️⚠️
+**问题位置**: `lib/services/subsonic_service.dart` 所有方法
+
+**问题描述**:
+- 所有网络请求的异常都被捕获并返回空列表/null
+- 用户无法区分"真的没数据"还是"出错了"
+- UI 层无法展示具体错误信息
+
+**代码示例**:
+```dart
+Future<List<Song>> getRandomSongs({int size = 10}) async {
+  try {
+    // ... 网络请求
+  } catch (e) {
+    debugPrint('Get random songs error: $e');
+    return [];  // ❌ 直接返回空列表
+  }
+}
+```
+
+**优化方案**:
+```dart
+// 1. 定义错误类型
+sealed class SubsonicException implements Exception {
+  final String message;
+  SubsonicException(this.message);
+}
+
+class NetworkException extends SubsonicException {
+  NetworkException(super.message);
+}
+
+class AuthenticationException extends SubsonicException {
+  AuthenticationException(super.message);
+}
+
+class ServerException extends SubsonicException {
+  final int statusCode;
+  ServerException(this.statusCode, super.message);
+}
+
+// 2. Service 层抛出具体异常
+Future<List<Song>> getRandomSongs({int size = 10}) async {
+  try {
+    final response = await _dio.get(...);
+
+    if (response.statusCode == 200) {
+      final data = response.data['subsonic-response'];
+      if (data['status'] == 'failed') {
+        final error = data['error'];
+        if (error['code'] == 40) {
+          throw AuthenticationException('认证失败');
+        }
+        throw ServerException(error['code'], error['message']);
+      }
+      // ... 正常处理
+    }
+    throw ServerException(response.statusCode!, 'Unexpected response');
+  } on DioException catch (e) {
+    if (e.type == DioExceptionType.connectionTimeout) {
+      throw NetworkException('连接超时');
+    }
+    throw NetworkException('网络请求失败: ${e.message}');
+  }
+}
+
+// 3. UI 层处理错误
+final randomSongsAsync = ref.watch(randomSongsProvider);
+randomSongsAsync.when(
+  data: (songs) => songs.isEmpty
+      ? const EmptyState('暂无歌曲')
+      : SongList(songs),
+  loading: () => const LoadingIndicator(),
+  error: (error, stack) {
+    if (error is NetworkException) {
+      return ErrorWidget(
+        message: '网络错误: ${error.message}',
+        onRetry: () => ref.refresh(randomSongsProvider),
+      );
+    } else if (error is AuthenticationException) {
+      return ErrorWidget(
+        message: '认证失败，请重新登录',
+        onRetry: () => context.go('/config'),
+      );
+    }
+    return ErrorWidget(message: '未知错误: $error');
+  },
+);
+```
+
+**相关文件**:
+- `lib/services/subsonic_service.dart` (所有方法)
+- `lib/screens/*_screen.dart` (所有使用 FutureProvider 的地方)
+
+---
+
+### 🟡 中等问题（建议修复）
+
+#### 5. **专辑缓存未区分列表类型** ⚠️
+**问题位置**: `lib/repositories/music_repository.dart`
+
+**问题描述**:
+- `MusicRepository.getAlbumList` 将 newest/random/frequent 全部写入同一个 Hive box
+- 缓存有效性用第一条专辑的 `cacheTime` 判断，可能导致随机/最近列表互相污染
+
+**代码示例**:
+```dart
+Future<List<Album>> getAlbumList({
+  String type = 'newest',
+  int size = 20,
+  int offset = 0,
+  bool forceRefresh = false,
+}) async {
+  // ❌ 不同类型的列表共用同一个缓存
+  if (!forceRefresh && _albumsBox.isNotEmpty) {
+    final cachedAlbums = _albumsBox.values.toList();
+    if (cachedAlbums.isNotEmpty && _isCacheValid(cachedAlbums.first.cacheTime)) {
+      return cachedAlbums;
+    }
+  }
+
+  final albums = await _subsonicService.getAlbumList(...);
+
+  if (albums.isNotEmpty) {
+    await _albumsBox.clear();  // ❌ 清空所有专辑
+    for (var album in albums) {
+      await _albumsBox.put(album.id, album);
+    }
+  }
+
+  return albums;
+}
+```
+
+**优化方案**:
+```dart
+class MusicRepository {
+  final Box<Album> _albumsBox;
+  final Box<List<String>> _cacheKeysBox;  // 存储缓存键列表
+
+  // 为不同类型的数据生成不同的缓存键
+  String _getCacheKey(String type, Map<String, dynamic> params) {
+    return '$type:${params.entries.map((e) => '${e.key}=${e.value}').join('&')}';
+  }
+
+  Future<List<Album>> getAlbumList({
+    String type = 'newest',
+    int size = 20,
+    int offset = 0,
+    bool forceRefresh = false,
+  }) async {
+    final cacheKey = _getCacheKey('albumList', {
+      'type': type,
+      'size': size,
+      'offset': offset,
+    });
+
+    // 检查缓存
+    if (!forceRefresh) {
+      final cachedIds = _cacheKeysBox.get(cacheKey);
+      if (cachedIds != null) {
+        final albums = cachedIds
+            .map((id) => _albumsBox.get(id))
+            .whereType<Album>()
+            .toList();
+        if (albums.isNotEmpty && _isCacheValid(albums.first.cacheTime)) {
+          return albums;
+        }
+      }
+    }
+
+    // 从网络获取
+    final albums = await _subsonicService.getAlbumList(...);
+
+    // 更新缓存（不清空其他数据）
+    if (albums.isNotEmpty) {
+      final ids = <String>[];
+      for (var album in albums) {
+        await _albumsBox.put(album.id, album);
+        ids.add(album.id);
+      }
+      await _cacheKeysBox.put(cacheKey, ids);
+    }
+
+    return albums;
+  }
+
+  // 随机歌曲不应该缓存
+  Future<List<Song>> getRandomSongs({int size = 10}) async {
+    return await _subsonicService.getRandomSongs(size: size);
+  }
+}
+```
+
+**相关文件**:
+- `lib/repositories/music_repository.dart`
+
+---
+
+#### 6. **搜索历史非响应式** ⚠️
+**问题位置**: `lib/services/search_service.dart`, `lib/providers/search_provider.dart`
+
+**问题描述**:
+- `SearchService` 构造函数里异步开箱，UI 可能在 box 就绪前读取，导致空数据
+- `searchHistoryProvider` 是普通 `Provider<List>`，UI 需 `setState` 手动刷新
+
+**优化方案**:
+```dart
+// 1. 使用 StateNotifier 管理搜索历史
+class SearchHistoryNotifier extends StateNotifier<List<SearchHistory>> {
+  final Box<SearchHistory> _box;
+
+  SearchHistoryNotifier(this._box) : super(_box.values.toList());
+
+  void addHistory(String query) {
+    final history = SearchHistory(
+      query: query,
+      timestamp: DateTime.now(),
+    );
+    _box.put(query, history);
+    state = _box.values.toList();
+  }
+
+  void removeHistory(String query) {
+    _box.delete(query);
+    state = _box.values.toList();
+  }
+
+  void clearHistory() {
+    _box.clear();
+    state = [];
+  }
+}
+
+// 2. Provider 定义
+final searchHistoryProvider = StateNotifierProvider<SearchHistoryNotifier, List<SearchHistory>>((ref) {
+  final box = Hive.box<SearchHistory>('search_history');
+  return SearchHistoryNotifier(box);
+});
+
+// 3. UI 层使用（自动响应）
+final history = ref.watch(searchHistoryProvider);
+```
+
+**相关文件**:
+- `lib/services/search_service.dart`
+- `lib/providers/search_provider.dart`
+- `lib/screens/search_screen.dart`
+
+---
+
+#### 7. **歌词 Provider 使用 Map 作为 family key** ⚠️
+**问题位置**: `lib/providers/lyrics_provider.dart`
+
+**问题描述**:
+- `lyricsProvider` 的参数是 `Map<String, String?>`
+- Map 以引用判等，每次调用都是新 key，会频繁重新请求
+
+**优化方案**:
+```dart
+// 方案 A: 使用自定义类作为 key
+@freezed
+class LyricsQuery with _$LyricsQuery {
+  const factory LyricsQuery({
+    String? artist,
+    String? title,
+  }) = _LyricsQuery;
+}
+
+final lyricsProvider = FutureProvider.family.autoDispose<String?, LyricsQuery>(
+  (ref, query) async {
+    final service = ref.watch(subsonicServiceProvider);
+    return await service.getLyrics(
+      artist: query.artist,
+      title: query.title,
+    );
+  },
+);
+
+// 使用
+ref.watch(lyricsProvider(LyricsQuery(artist: song.artist, title: song.title)));
+
+// 方案 B: 使用字符串拼接作为 key
+final lyricsProvider = FutureProvider.family.autoDispose<String?, String>(
+  (ref, key) async {
+    final parts = key.split('|');
+    final artist = parts[0];
+    final title = parts[1];
+
+    final service = ref.watch(subsonicServiceProvider);
+    return await service.getLyrics(artist: artist, title: title);
+  },
+);
+
+// 使用
+ref.watch(lyricsProvider('${song.artist}|${song.title}'));
+```
+
+**相关文件**:
+- `lib/providers/lyrics_provider.dart`
+
+---
+
+#### 8. **睡眠定时器状态仅用计数器"打点"刷新** ⚠️
+**问题位置**: `lib/providers/sleep_timer_provider.dart`, `lib/services/sleep_timer_service.dart`
+
+**问题描述**:
+- `sleepTimerStateProvider` 通过自增 `int` 触发刷新，无法表达剩余时间/运行状态
+
+**优化方案**:
+```dart
+// 1. 定义睡眠定时器状态
+@freezed
+class SleepTimerState with _$SleepTimerState {
+  const factory SleepTimerState({
+    @Default(false) bool isActive,
+    @Default(Duration.zero) Duration remaining,
+    DateTime? endTime,
+  }) = _SleepTimerState;
+}
+
+// 2. 使用 StateNotifier 管理状态
+class SleepTimerNotifier extends StateNotifier<SleepTimerState> {
+  Timer? _timer;
+
+  SleepTimerNotifier() : super(const SleepTimerState());
+
+  void start(Duration duration) {
+    final endTime = DateTime.now().add(duration);
+    state = SleepTimerState(
+      isActive: true,
+      remaining: duration,
+      endTime: endTime,
+    );
+
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      final now = DateTime.now();
+      if (now.isAfter(endTime)) {
+        stop();
+        // 停止播放
+      } else {
+        state = state.copyWith(
+          remaining: endTime.difference(now),
+        );
+      }
+    });
+  }
+
+  void stop() {
+    _timer?.cancel();
+    state = const SleepTimerState();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+}
+
+// 3. Provider 定义
+final sleepTimerProvider = StateNotifierProvider<SleepTimerNotifier, SleepTimerState>((ref) {
+  return SleepTimerNotifier();
+});
+
+// 4. UI 层使用
+final timerState = ref.watch(sleepTimerProvider);
+if (timerState.isActive) {
+  Text('剩余时间: ${timerState.remaining.inMinutes}:${timerState.remaining.inSeconds % 60}');
+}
+```
+
+**相关文件**:
+- `lib/providers/sleep_timer_provider.dart`
+- `lib/services/sleep_timer_service.dart`
+
+---
+
+### 🟢 轻微问题（可选优化）
+
+#### 9. **Service 层职责不清晰**
+**问题位置**: `lib/services/favorite_service.dart`, `lib/services/playlist_service.dart`
+
+**问题描述**:
+- `FavoriteService`、`PlaylistService` 只是简单转发调用到 `SubsonicService`，没有额外逻辑
+- 增加了代码复杂度，没有提供价值
+
+**优化方案**:
+```dart
+// 方案 A: 移除中间层，直接使用 SubsonicService
+final favoriteServiceProvider = Provider<SubsonicService>((ref) {
+  return ref.watch(subsonicServiceProvider);
+});
+
+// 方案 B: 如果需要额外逻辑，才保留 Service 层
+class FavoriteService {
+  final SubsonicService _subsonicService;
+  final Box<String> _localFavoritesBox;  // 本地收藏缓存
+
+  // 提供离线收藏功能
+  Future<bool> starSong(String songId) async {
+    // 先更新本地缓存
+    await _localFavoritesBox.put(songId, songId);
+
+    // 再同步到服务器
+    try {
+      return await _subsonicService.star(id: songId);
+    } catch (e) {
+      // 失败时加入待同步队列
+      return true;  // 本地操作成功
+    }
+  }
+}
+```
+
+**相关文件**:
+- `lib/services/favorite_service.dart`
+- `lib/services/playlist_service.dart`
+- `lib/services/search_service.dart`
+
+---
+
+#### 10. **Provider 命名不一致**
+**问题位置**: `lib/providers/` 目录
+
+**优化方案**:
+```dart
+// 统一命名规范：
+// 1. Service/Repository 实例: xxxServiceProvider / xxxRepositoryProvider
+// 2. 数据 Provider: xxxProvider
+// 3. 状态 Provider: xxxStateProvider
+
+// Service 层
+final audioPlayerServiceProvider = Provider<AudioPlayerService>(...);
+final subsonicServiceProvider = Provider<SubsonicService>(...);
+
+// Repository 层
+final musicRepositoryProvider = Provider<MusicRepository>(...);
+
+// 数据层
+final currentSongProvider = StreamProvider<Song?>(...);
+final starredSongsProvider = FutureProvider<List<Song>>(...);
+
+// 状态层
+final playModeStateProvider = StateProvider<PlayMode>(...);
+final serverConfigStateProvider = StateProvider<ServerConfig?>(...);
+```
+
+---
+
+## 🎯 需要你确认的方向
+
+### 1. 播放状态管理方案选择
+**选项 A**: Service + Streams（保持现有模式，修复双重状态源）
+- ✅ 改动较小，风险低
+- ❌ 需要手动管理 Stream 生命周期
+
+**选项 B**: StateNotifier（完全由 Riverpod 管理）
+- ✅ 更符合 Riverpod 最佳实践
+- ✅ 自动管理生命周期
+- ❌ 改动较大，需要重构
+
+**你的选择**: ___________
+
+### 2. 路由统一方案
+**选项 A**: 统一到 go_router
+- ✅ 支持深链、URL 同步
+- ✅ 声明式路由，易维护
+- ❌ 需要重构所有 Navigator.push
+
+**选项 B**: 保持混用
+- ✅ 无需改动
+- ❌ 路由行为不一致
+
+**你的选择**: ___________
+
+### 3. 服务器配置策略
+**选项 A**: 必须配置才能进入
+- ✅ 避免未配置崩溃
+- ❌ 无法离线使用
+
+**选项 B**: 允许跳过，进入离线模式
+- ✅ 支持离线播放本地缓存
+- ❌ 需要处理未配置状态
+
+**你的选择**: ___________
+
+---
+
+## 📊 架构评分
+
+| 维度 | 评分 | 说明 |
+|------|------|------|
+| **分层清晰度** | ⭐⭐⭐⭐☆ (4/5) | 分层明确，但 Service 层职责不清 |
+| **状态管理** | ⭐⭐⭐☆☆ (3/5) | 存在双重状态源问题 |
+| **错误处理** | ⭐⭐☆☆☆ (2/5) | 吞掉所有异常，用户体验差 |
+| **缓存策略** | ⭐⭐⭐☆☆ (3/5) | 有缓存但逻辑有缺陷 |
+| **代码可读性** | ⭐⭐⭐⭐☆ (4/5) | 命名清晰，但缺少注释 |
+| **可测试性** | ⭐⭐☆☆☆ (2/5) | 单例模式、缺少测试 |
+| **可维护性** | ⭐⭐⭐☆☆ (3/5) | 中等，需要优化状态管理 |
+
+**总体评分**: ⭐⭐⭐☆☆ (3/5)
+
+---
+
+## 🚀 优化优先级建议
+
+### 🔥 高优先级（必须修复）
+1. **修复状态管理混乱问题** - 统一播放器状态源
+2. **完善错误处理** - 定义异常类型，UI 层正确展示错误
+3. **修复服务器配置生命周期** - 避免未配置崩溃
+
+### 🔶 中优先级（建议修复）
+4. **修复缓存逻辑** - 按数据类型分离缓存
+5. **统一路由体系** - 全部使用 go_router
+6. **修复搜索历史响应式** - 使用 StateNotifier
+7. **修复歌词 Provider** - 使用正确的 family key
+
+### 🔷 低优先级（可选优化）
+8. **简化 Service 层** - 移除无价值的转发层
+9. **统一命名规范** - Provider 命名一致性
+10. **添加日志系统** - 便于生产环境问题追踪
+11. **添加单元测试** - 提升代码可靠性
+
+---
+
+## 📝 重构建议
+
+### 阶段一：修复核心问题（1-2周）
+1. 重构播放器状态管理（选择方案 A 或 B）
+2. 实现统一的错误处理机制
+3. 修复服务器配置生命周期
+
+### 阶段二：优化架构（2-3周）
+4. 修复缓存逻辑
+5. 统一路由体系
+6. 修复搜索历史和歌词 Provider
+
+### 阶段三：提升质量（持续）
+7. 简化 Service 层
+8. 添加单元测试
+9. 完善文档
+
+---
+
+## 💡 总结
+
+Chanson 项目整体架构**基础良好**，采用了现代化的技术栈和清晰的分层设计。但在**状态管理、错误处理、缓存策略**三个核心领域存在明显问题，需要优先修复。
+
+建议按照上述优先级逐步重构，避免一次性大规模改动导致的风险。每个阶段完成后进行充分测试，确保功能正常。
+
+**关键改进方向**:
+- ✅ 统一状态管理，消除双重状态源
+- ✅ 完善错误处理，提升用户体验
+- ✅ 优化缓存策略，支持更多场景
+- ✅ 统一路由体系，提升可维护性
+
+---
+
+**评审人**: Claude (AI 架构师)
+**评审日期**: 2026-01-22
+
