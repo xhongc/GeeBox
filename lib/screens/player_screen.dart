@@ -34,16 +34,20 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final currentSongAsync = ref.watch(currentSongProvider);
+    final audioService = ref.watch(audioPlayerServiceProvider);
     final playerState = ref.watch(playerStateProvider);
     final position = ref.watch(positionProvider);
     final duration = ref.watch(durationProvider);
-    final audioService = ref.watch(audioPlayerServiceProvider);
     final subsonicService = ref.watch(subsonicServiceProvider);
     final repository = ref.watch(musicRepositoryProvider);
 
+    // 监听 stream 来触发重建
+    ref.listen(currentSongProvider, (previous, next) {});
+
+    // 直接从 service 获取当前歌曲
+    final currentSong = audioService.currentSong;
+
     // 如果没有歌曲，返回空页面
-    final currentSong = currentSongAsync.value;
     if (currentSong == null) {
       return Scaffold(
         appBar: AppBar(

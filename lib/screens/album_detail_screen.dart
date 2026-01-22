@@ -220,6 +220,7 @@ class AlbumDetailScreen extends ConsumerWidget {
     int trackNumber,
     List<Song> allSongs,
   ) {
+    // 直接 watch currentSongProvider 来监听当前播放歌曲的变化
     final currentSongAsync = ref.watch(currentSongProvider);
     final currentSong = currentSongAsync.value;
     final isPlaying = currentSong?.id == song.id;

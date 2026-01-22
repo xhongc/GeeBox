@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import '../models/song.dart';
 import '../models/album.dart';
 import '../models/artist.dart';
@@ -58,7 +59,7 @@ class SubsonicService {
       }
       return false;
     } catch (e) {
-      print('Ping error: $e');
+      debugPrint('Ping error: $e');
       return false;
     }
   }
@@ -83,7 +84,7 @@ class SubsonicService {
       }
       return [];
     } catch (e) {
-      print('Get random songs error: $e');
+      debugPrint('Get random songs error: $e');
       return [];
     }
   }
@@ -114,7 +115,7 @@ class SubsonicService {
       }
       return [];
     } catch (e) {
-      print('Get album list error: $e');
+      debugPrint('Get album list error: $e');
       return [];
     }
   }
@@ -139,7 +140,7 @@ class SubsonicService {
       }
       return [];
     } catch (e) {
-      print('Get album error: $e');
+      debugPrint('Get album error: $e');
       return [];
     }
   }
@@ -192,7 +193,7 @@ class SubsonicService {
       }
       return {'songs': [], 'albums': []};
     } catch (e) {
-      print('Search error: $e');
+      debugPrint('Search error: $e');
       return {'songs': [], 'albums': []};
     }
   }
@@ -222,7 +223,7 @@ class SubsonicService {
       }
       return [];
     } catch (e) {
-      print('Get playlists error: $e');
+      debugPrint('Get playlists error: $e');
       return [];
     }
   }
@@ -246,7 +247,7 @@ class SubsonicService {
       }
       return null;
     } catch (e) {
-      print('Get playlist error: $e');
+      debugPrint('Get playlist error: $e');
       return null;
     }
   }
@@ -281,7 +282,7 @@ class SubsonicService {
       }
       return null;
     } catch (e) {
-      print('Create playlist error: $e');
+      debugPrint('Create playlist error: $e');
       return null;
     }
   }
@@ -313,7 +314,7 @@ class SubsonicService {
       }
       return false;
     } catch (e) {
-      print('Update playlist info error: $e');
+      debugPrint('Update playlist info error: $e');
       return false;
     }
   }
@@ -339,7 +340,7 @@ class SubsonicService {
       }
       return false;
     } catch (e) {
-      print('Add song to playlist error: $e');
+      debugPrint('Add song to playlist error: $e');
       return false;
     }
   }
@@ -365,7 +366,7 @@ class SubsonicService {
       }
       return false;
     } catch (e) {
-      print('Remove song from playlist error: $e');
+      debugPrint('Remove song from playlist error: $e');
       return false;
     }
   }
@@ -387,7 +388,7 @@ class SubsonicService {
       }
       return false;
     } catch (e) {
-      print('Delete playlist error: $e');
+      debugPrint('Delete playlist error: $e');
       return false;
     }
   }
@@ -427,7 +428,7 @@ class SubsonicService {
       }
       return [];
     } catch (e) {
-      print('Get artists error: $e');
+      debugPrint('Get artists error: $e');
       return [];
     }
   }
@@ -451,7 +452,7 @@ class SubsonicService {
       }
       return null;
     } catch (e) {
-      print('Get artist error: $e');
+      debugPrint('Get artist error: $e');
       return null;
     }
   }
@@ -475,7 +476,7 @@ class SubsonicService {
       }
       return false;
     } catch (e) {
-      print('Star error: $e');
+      debugPrint('Star error: $e');
       return false;
     }
   }
@@ -499,7 +500,7 @@ class SubsonicService {
       }
       return false;
     } catch (e) {
-      print('Unstar error: $e');
+      debugPrint('Unstar error: $e');
       return false;
     }
   }
@@ -523,7 +524,7 @@ class SubsonicService {
       }
       return [];
     } catch (e) {
-      print('Get starred songs error: $e');
+      debugPrint('Get starred songs error: $e');
       return [];
     }
   }
@@ -547,7 +548,7 @@ class SubsonicService {
       }
       return false;
     } catch (e) {
-      print('Scrobble error: $e');
+      debugPrint('Scrobble error: $e');
       return false;
     }
   }
@@ -580,7 +581,7 @@ class SubsonicService {
       }
       return [];
     } catch (e) {
-      print('Get songs by genre error: $e');
+      debugPrint('Get songs by genre error: $e');
       return [];
     }
   }
@@ -611,7 +612,7 @@ class SubsonicService {
       }
       return null;
     } catch (e) {
-      print('Get lyrics error: $e');
+      debugPrint('Get lyrics error: $e');
       return null;
     }
   }

@@ -1,4 +1,5 @@
 import 'package:hive/hive.dart';
+import 'package:flutter/foundation.dart';
 import '../models/playlist.dart';
 import '../models/song.dart';
 import 'subsonic_service.dart';
@@ -74,7 +75,7 @@ class PlaylistService {
         }
       }
     } catch (e) {
-      print('Sync from server error: $e');
+      debugPrint('Sync from server error: $e');
     }
   }
 
@@ -118,7 +119,7 @@ class PlaylistService {
         }
       }
     } catch (e) {
-      print('Sync playlist from server error: $e');
+      debugPrint('Sync playlist from server error: $e');
     }
   }
 
@@ -159,7 +160,7 @@ class PlaylistService {
         );
       }
     } catch (e) {
-      print('Create playlist error: $e');
+      debugPrint('Create playlist error: $e');
       return null;
     }
   }
@@ -199,7 +200,7 @@ class PlaylistService {
       }
       return false;
     } catch (e) {
-      print('Update playlist error: $e');
+      debugPrint('Update playlist error: $e');
       return false;
     }
   }
@@ -219,7 +220,7 @@ class PlaylistService {
       }
       return false;
     } catch (e) {
-      print('Delete playlist error: $e');
+      debugPrint('Delete playlist error: $e');
       return false;
     }
   }
@@ -253,7 +254,7 @@ class PlaylistService {
       }
       return false;
     } catch (e) {
-      print('Add song to playlist error: $e');
+      debugPrint('Add song to playlist error: $e');
       return false;
     }
   }
@@ -288,7 +289,7 @@ class PlaylistService {
       }
       return false;
     } catch (e) {
-      print('Remove song from playlist error: $e');
+      debugPrint('Remove song from playlist error: $e');
       return false;
     }
   }

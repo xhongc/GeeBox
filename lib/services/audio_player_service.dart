@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:just_audio/just_audio.dart';
+import 'package:flutter/foundation.dart';
 import '../models/song.dart';
 
 /// 播放模式枚举
@@ -126,7 +127,7 @@ class AudioPlayerService {
         }
       });
     } catch (e) {
-      print('Play song error: $e');
+      debugPrint('Play song error: $e');
     }
   }
 
