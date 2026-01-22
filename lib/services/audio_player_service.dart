@@ -146,6 +146,9 @@ class AudioPlayerService {
       // 更新当前歌曲
       _currentSong = song;
 
+      // 立即通知当前歌曲变化，确保 UI 能立即响应
+      _currentSongController.add(song);
+
       // 重置 scrobble 标记
       _hasScrobbled = false;
 
@@ -154,9 +157,6 @@ class AudioPlayerService {
 
       await _player.setUrl(streamUrl);
       await _player.play();
-
-      // 通知当前歌曲变化
-      _currentSongController.add(song);
 
       // 监听播放进度，30秒后提交 scrobble
       _positionSubscription = _player.positionStream.listen((position) {
@@ -179,9 +179,6 @@ class AudioPlayerService {
     final song = _playlist[index];
     final streamUrl = getStreamUrl(song.id);
     await playSong(song, streamUrl);
-
-    // 通知当前歌曲变化（playSong 中已经发送，这里是为了确保）
-    _currentSongController.add(song);
   }
 
   /// 播放/暂停
