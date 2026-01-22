@@ -227,14 +227,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                                 iconSize: 28,
                                 onPressed: () async {
                                   final service = ref.read(favoriteServiceProvider);
+                                  final messenger = ScaffoldMessenger.of(context);
                                   if (starred) {
                                     await service.unstarSong(currentSong.id);
-                                    ScaffoldMessenger.of(context).showSnackBar(
+                                    messenger.showSnackBar(
                                       const SnackBar(content: Text('已取消收藏')),
                                     );
                                   } else {
                                     await service.starSong(currentSong.id);
-                                    ScaffoldMessenger.of(context).showSnackBar(
+                                    messenger.showSnackBar(
                                       const SnackBar(content: Text('已添加到我喜欢的音乐')),
                                     );
                                   }
@@ -269,12 +270,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                 child: Column(
                   children: [
                     SliderTheme(
-                      data: SliderThemeData(
+                      data: const SliderThemeData(
                         trackHeight: 3,
-                        thumbShape: const RoundSliderThumbShape(
+                        thumbShape: RoundSliderThumbShape(
                           enabledThumbRadius: 6,
                         ),
-                        overlayShape: const RoundSliderOverlayShape(
+                        overlayShape: RoundSliderOverlayShape(
                           overlayRadius: 16,
                         ),
                       ),

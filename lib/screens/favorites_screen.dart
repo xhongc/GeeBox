@@ -132,7 +132,7 @@ class FavoritesScreen extends ConsumerWidget {
   void _showSongOptions(BuildContext context, WidgetRef ref, Song song) {
     showModalBottomSheet(
       context: context,
-      builder: (context) => SafeArea(
+      builder: (_) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -140,11 +140,12 @@ class FavoritesScreen extends ConsumerWidget {
               leading: const Icon(Icons.favorite, color: Colors.red),
               title: const Text('取消收藏'),
               onTap: () async {
+                final messenger = ScaffoldMessenger.of(context);
                 Navigator.pop(context);
                 final service = ref.read(favoriteServiceProvider);
                 await service.unstarSong(song.id);
                 ref.invalidate(starredSongsProvider);
-                ScaffoldMessenger.of(context).showSnackBar(
+                messenger.showSnackBar(
                   const SnackBar(content: Text('已取消收藏')),
                 );
               },

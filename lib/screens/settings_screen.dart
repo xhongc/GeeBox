@@ -14,9 +14,9 @@ class SettingsScreen extends ConsumerWidget {
       body: CustomScrollView(
         slivers: [
           // 顶部应用栏
-          SliverAppBar(
+          const SliverAppBar(
             floating: true,
-            title: const Text(
+            title: Text(
               '设置',
               style: TextStyle(
                 fontSize: 28,
