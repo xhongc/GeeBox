@@ -37,29 +37,19 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
         : _selectedCategory == 'random'
             ? ref.watch(randomAlbumsProvider)
             : ref.watch(frequentAlbumsProvider);
-    return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          // 顶部应用栏
-          SliverAppBar(
-            floating: true,
-            title: const Text(
-              '发现',
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.search),
-                onPressed: () {
-                  context.push('/search');
-                },
-              ),
-            ],
+    return FScaffold(
+      childPad: false,
+      header: FHeader.nested(
+        title: const Text('发现'),
+        suffixes: [
+          FHeaderAction(
+            icon: const Icon(FLucideIcons.search),
+            onPress: () => context.push('/search'),
           ),
-
+        ],
+      ),
+      child: CustomScrollView(
+        slivers: [
           // 分类标签
           SliverToBoxAdapter(
             child: Padding(

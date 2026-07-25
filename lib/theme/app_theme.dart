@@ -48,7 +48,7 @@ class AppTheme {
       navigationBarTheme: NavigationBarThemeData(
         elevation: 0,
         backgroundColor: Colors.white,
-        indicatorColor: seedColor.withOpacity(0.15),
+        indicatorColor: seedColor.withValues(alpha: 0.15),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
             return TextStyle(
@@ -94,7 +94,7 @@ class AppTheme {
       navigationBarTheme: NavigationBarThemeData(
         elevation: 0,
         backgroundColor: const Color(0xFF1E1E1E),
-        indicatorColor: seedColor.withOpacity(0.2),
+        indicatorColor: seedColor.withValues(alpha: 0.2),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
             return TextStyle(

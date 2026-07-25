@@ -269,18 +269,18 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     showModalBottomSheet(
       context: context,
       builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.playlist_add),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          child: FCard(
+            child: FTile(
+              prefix: const Icon(FLucideIcons.listPlus),
               title: const Text('添加到播放列表'),
-              onTap: () {
+              onPress: () {
                 Navigator.pop(context);
                 showAddToPlaylistDialog(context, ref, song);
               },
             ),
-          ],
+          ),
         ),
       ),
     );

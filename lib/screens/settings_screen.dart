@@ -118,47 +118,53 @@ class SettingsScreen extends ConsumerWidget {
   void _showThemeModeDialog(BuildContext context, WidgetRef ref) {
     final themeSettings = ref.read(themeSettingsProvider);
 
-    showDialog(
+    showFDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('主题模式'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            RadioListTile<AppThemeMode>(
-              title: const Text('浅色'),
-              value: AppThemeMode.light,
-              groupValue: themeSettings.mode,
-              onChanged: (value) {
-                if (value != null) {
-                  ref.read(themeSettingsProvider.notifier).setThemeMode(value);
+      builder: (context, style, animation) => FDialog(
+        animation: animation,
+        builder: (context, style) => Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('主题模式', style: style.titleTextStyle),
+              const SizedBox(height: 16),
+              _ThemeModeTile(
+                title: '浅色',
+                icon: FLucideIcons.sun,
+                selected: themeSettings.mode == AppThemeMode.light,
+                onPress: () {
+                  ref
+                      .read(themeSettingsProvider.notifier)
+                      .setThemeMode(AppThemeMode.light);
                   Navigator.pop(context);
-                }
-              },
-            ),
-            RadioListTile<AppThemeMode>(
-              title: const Text('深色'),
-              value: AppThemeMode.dark,
-              groupValue: themeSettings.mode,
-              onChanged: (value) {
-                if (value != null) {
-                  ref.read(themeSettingsProvider.notifier).setThemeMode(value);
+                },
+              ),
+              _ThemeModeTile(
+                title: '深色',
+                icon: FLucideIcons.moon,
+                selected: themeSettings.mode == AppThemeMode.dark,
+                onPress: () {
+                  ref
+                      .read(themeSettingsProvider.notifier)
+                      .setThemeMode(AppThemeMode.dark);
                   Navigator.pop(context);
-                }
-              },
-            ),
-            RadioListTile<AppThemeMode>(
-              title: const Text('跟随系统'),
-              value: AppThemeMode.system,
-              groupValue: themeSettings.mode,
-              onChanged: (value) {
-                if (value != null) {
-                  ref.read(themeSettingsProvider.notifier).setThemeMode(value);
+                },
+              ),
+              _ThemeModeTile(
+                title: '跟随系统',
+                icon: FLucideIcons.monitorCog,
+                selected: themeSettings.mode == AppThemeMode.system,
+                onPress: () {
+                  ref
+                      .read(themeSettingsProvider.notifier)
+                      .setThemeMode(AppThemeMode.system);
                   Navigator.pop(context);
-                }
-              },
-            ),
-          ],
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -167,46 +173,89 @@ class SettingsScreen extends ConsumerWidget {
   void _showThemeColorDialog(BuildContext context, WidgetRef ref) {
     final themeSettings = ref.read(themeSettingsProvider);
 
-    showDialog(
+    showFDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('选择主题色'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: GridView.builder(
-            shrinkWrap: true,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 4,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-            ),
-            itemCount: AppTheme.themeColors.length,
-            itemBuilder: (context, index) {
-              final color = AppTheme.themeColors[index];
-              final isSelected = color.value == themeSettings.seedColor.value;
-
-              return InkWell(
-                onTap: () {
-                  ref.read(themeSettingsProvider.notifier).setSeedColor(color);
-                  Navigator.pop(context);
-                },
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: color,
-                    shape: BoxShape.circle,
-                    border: isSelected
-                        ? Border.all(color: Colors.white, width: 3)
-                        : null,
-                  ),
-                  child: isSelected
-                      ? const Icon(Icons.check, color: Colors.white)
-                      : null,
+      builder: (context, style, animation) => FDialog(
+        animation: animation,
+        builder: (context, style) => Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('选择主题色', style: style.titleTextStyle),
+              const SizedBox(height: 16),
+              GridView.builder(
+                shrinkWrap: true,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 4,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
                 ),
-              );
-            },
+                itemCount: AppTheme.themeColors.length,
+                itemBuilder: (context, index) {
+                  final color = AppTheme.themeColors[index];
+                  final isSelected =
+                      color.toARGB32() == themeSettings.seedColor.toARGB32();
+
+                  return FTappable(
+                    onPress: () {
+                      ref
+                          .read(themeSettingsProvider.notifier)
+                          .setSeedColor(color);
+                      Navigator.pop(context);
+                    },
+                    builder: (context, variants, child) => DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: isSelected
+                              ? context.theme.colors.foreground
+                              : context.theme.colors.border,
+                          width: isSelected ? 3 : 1,
+                        ),
+                      ),
+                      child: isSelected
+                          ? const Icon(FLucideIcons.check, color: Colors.white)
+                          : null,
+                    ),
+                  );
+                },
+              ),
+            ],
           ),
         ),
       ),
+    );
+  }
+}
+
+class _ThemeModeTile extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onPress;
+
+  const _ThemeModeTile({
+    required this.title,
+    required this.icon,
+    required this.selected,
+    required this.onPress,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return FTile(
+      prefix: Icon(icon),
+      title: Text(title),
+      suffix: selected
+          ? Icon(
+              FLucideIcons.check,
+              color: context.theme.colors.primary,
+            )
+          : null,
+      onPress: onPress,
     );
   }
 }

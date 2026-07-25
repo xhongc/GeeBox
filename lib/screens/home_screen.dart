@@ -28,36 +28,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
     final mediaSettings = ref.watch(mediaTypeSettingsProvider);
     final recentAlbumsAsync = ref.watch(recentAlbumsProvider);
     final randomAlbumsAsync = ref.watch(randomAlbumsProvider);
 
-    return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          // 顶部应用栏
-          SliverAppBar(
-            floating: true,
-            title: Text(
-              'Chanson',
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                color: colorScheme.primary,
-              ),
-            ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.search),
-                onPressed: () {
-                  context.push('/search');
-                },
-              ),
-            ],
+    return FScaffold(
+      childPad: false,
+      header: FHeader.nested(
+        title: const Text('Chanson'),
+        suffixes: [
+          FHeaderAction(
+            icon: const Icon(FLucideIcons.search),
+            onPress: () => context.push('/search'),
           ),
-
+        ],
+      ),
+      child: CustomScrollView(
+        slivers: [
           // 问候语
           SliverToBoxAdapter(
             child: Padding(

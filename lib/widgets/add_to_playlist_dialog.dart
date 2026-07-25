@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:forui/forui.dart';
 import '../providers/playlist_provider.dart';
 import '../models/song.dart';
+import 'forui_components.dart';
 
 /// 显示添加到播放列表的对话框
 void showAddToPlaylistDialog(BuildContext context, WidgetRef ref, Song song) {
@@ -24,179 +26,201 @@ class AddToPlaylistSheet extends ConsumerWidget {
     final playlistsAsync = ref.watch(playlistsProvider);
 
     return SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                const Text(
-                  '添加到播放列表',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        child: FCard(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+                child: Row(
+                  children: [
+                    Text(
+                      '添加到播放列表',
+                      style: context.theme.typography.body.lg.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const Spacer(),
+                    FButton.icon(
+                      variant: FButtonVariant.ghost,
+                      size: FButtonSizeVariant.sm,
+                      onPress: () => Navigator.pop(context),
+                      child: const Icon(FLucideIcons.x),
+                    ),
+                  ],
                 ),
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 1),
-          ListTile(
-            leading: const Icon(Icons.add),
-            title: const Text('创建新播放列表'),
-            onTap: () {
-              Navigator.pop(context);
-              _showCreatePlaylistDialog(context, ref, song);
-            },
-          ),
-          const Divider(height: 1),
-          playlistsAsync.when(
-            data: (playlists) {
-              if (playlists.isEmpty) {
-                return const Padding(
-                  padding: EdgeInsets.all(32),
-                  child: Text(
-                    '还没有播放列表',
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                );
-              }
-
-              return Flexible(
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: playlists.length,
-                  itemBuilder: (context, index) {
-                    final playlist = playlists[index];
-                    final isInPlaylist = playlist.songIds.contains(song.id);
-
-                    return ListTile(
-                      leading: const Icon(Icons.queue_music),
-                      title: Text(playlist.name),
-                      subtitle: Text('${playlist.songIds.length} 首歌曲'),
-                      trailing: isInPlaylist
-                          ? const Icon(Icons.check, color: Colors.green)
-                          : null,
-                      onTap: isInPlaylist
-                          ? null
-                          : () async {
-                              final service = ref.read(playlistServiceProvider);
-                              await service.addSongToPlaylist(playlist.id, song.id);
-                              refreshPlaylists(ref);
-                              refreshPlaylist(ref, playlist.id);
-
-                              if (context.mounted) {
-                                Navigator.pop(context);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('已添加到: ${playlist.name}'),
-                                  ),
-                                );
-                              }
-                            },
+              ),
+              FTile(
+                prefix: const Icon(FLucideIcons.plus),
+                title: const Text('创建新播放列表'),
+                onPress: () {
+                  Navigator.pop(context);
+                  _showCreatePlaylistDialog(context, ref, song);
+                },
+              ),
+              playlistsAsync.when(
+                data: (playlists) {
+                  if (playlists.isEmpty) {
+                    return const SizedBox(
+                      height: 180,
+                      child: ChansonEmptyState(
+                        icon: FLucideIcons.listMusic,
+                        message: '还没有播放列表',
+                      ),
                     );
-                  },
+                  }
+
+                  return Flexible(
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: playlists.length,
+                      itemBuilder: (context, index) {
+                        final playlist = playlists[index];
+                        final isInPlaylist = playlist.songIds.contains(song.id);
+
+                        return FTile(
+                          prefix: const Icon(FLucideIcons.listMusic),
+                          title: Text(playlist.name),
+                          subtitle: Text('${playlist.songIds.length} 首歌曲'),
+                          suffix: isInPlaylist
+                              ? Icon(
+                                  FLucideIcons.check,
+                                  color: context.theme.colors.primary,
+                                )
+                              : null,
+                          onPress: isInPlaylist
+                              ? null
+                              : () async {
+                                  final service =
+                                      ref.read(playlistServiceProvider);
+                                  await service.addSongToPlaylist(
+                                      playlist.id, song.id);
+                                  refreshPlaylists(ref);
+                                  refreshPlaylist(ref, playlist.id);
+
+                                  if (context.mounted) {
+                                    Navigator.pop(context);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('已添加到: ${playlist.name}'),
+                                      ),
+                                    );
+                                  }
+                                },
+                        );
+                      },
+                    ),
+                  );
+                },
+                loading: () => const SizedBox(
+                  height: 160,
+                  child: Center(child: FCircularProgress()),
                 ),
-              );
-            },
-            loading: () => const Padding(
-              padding: EdgeInsets.all(32),
-              child: Center(child: CircularProgressIndicator()),
-            ),
-            error: (error, stack) => Padding(
-              padding: const EdgeInsets.all(32),
-              child: Text('加载失败: $error'),
-            ),
+                error: (error, stack) => Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: ChansonAlert(
+                    title: '加载失败',
+                    message: '$error',
+                    variant: FAlertVariant.destructive,
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
-        ],
+        ),
       ),
     );
   }
 
-  void _showCreatePlaylistDialog(BuildContext context, WidgetRef ref, Song song) {
+  void _showCreatePlaylistDialog(
+      BuildContext context, WidgetRef ref, Song song) {
     final nameController = TextEditingController();
     final descriptionController = TextEditingController();
 
-    showDialog(
+    showFDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('创建播放列表'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(
-                labelText: '名称',
-                hintText: '输入播放列表名称',
+      builder: (context, style, animation) => FDialog(
+        animation: animation,
+        builder: (context, style) => Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('创建播放列表', style: style.titleTextStyle),
+              const SizedBox(height: 18),
+              FTextField(
+                control: FTextFieldControl.managed(controller: nameController),
+                label: const Text('名称'),
+                hint: '输入播放列表名称',
+                autofocus: true,
               ),
-              autofocus: true,
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: descriptionController,
-              decoration: const InputDecoration(
-                labelText: '描述（可选）',
-                hintText: '输入播放列表描述',
+              const SizedBox(height: 14),
+              FTextField(
+                control: FTextFieldControl.managed(
+                  controller: descriptionController,
+                ),
+                label: const Text('描述（可选）'),
+                hint: '输入播放列表描述',
+                maxLines: 3,
               ),
-              maxLines: 3,
-            ),
-          ],
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  FButton(
+                    variant: FButtonVariant.outline,
+                    onPress: () => Navigator.pop(context),
+                    child: const Text('取消'),
+                  ),
+                  const SizedBox(width: 8),
+                  FButton(
+                    onPress: () async {
+                      final name = nameController.text.trim();
+                      if (name.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('请输入播放列表名称')),
+                        );
+                        return;
+                      }
+
+                      final service = ref.read(playlistServiceProvider);
+                      final playlist = await service.createPlaylist(
+                        name: name,
+                        description: descriptionController.text.trim().isEmpty
+                            ? null
+                            : descriptionController.text.trim(),
+                      );
+
+                      if (playlist == null) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('创建播放列表失败')),
+                          );
+                        }
+                        return;
+                      }
+
+                      await service.addSongToPlaylist(playlist.id, song.id);
+
+                      refreshPlaylists(ref);
+
+                      if (context.mounted) {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('已创建播放列表并添加歌曲: $name')),
+                        );
+                      }
+                    },
+                    child: const Text('创建'),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () async {
-              final name = nameController.text.trim();
-              if (name.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('请输入播放列表名称')),
-                );
-                return;
-              }
-
-              final service = ref.read(playlistServiceProvider);
-              final playlist = await service.createPlaylist(
-                name: name,
-                description: descriptionController.text.trim().isEmpty
-                    ? null
-                    : descriptionController.text.trim(),
-              );
-
-              if (playlist == null) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('创建播放列表失败')),
-                  );
-                }
-                return;
-              }
-
-              // 添加歌曲到新创建的播放列表
-              await service.addSongToPlaylist(playlist.id, song.id);
-
-              refreshPlaylists(ref);
-
-              if (context.mounted) {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('已创建播放列表并添加歌曲: $name')),
-                );
-              }
-            },
-            child: const Text('创建'),
-          ),
-        ],
       ),
     );
   }

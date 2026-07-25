@@ -399,116 +399,132 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   }
 
   void _showLyricsDialog(BuildContext context, currentSong) {
-    showDialog(
+    showFDialog(
       context: context,
-      builder: (context) => Dialog(
-        child: Container(
-          height: MediaQuery.of(context).size.height * 0.7,
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      builder: (context, style, animation) => FDialog(
+        animation: animation,
+        constraints: const BoxConstraints(minWidth: 280, maxWidth: 680),
+        builder: (context, style) {
+          final theme = context.theme;
+
+          return SizedBox(
+            height: MediaQuery.of(context).size.height * 0.7,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          currentSong.title,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              currentSong.title,
+                              style: theme.typography.body.lg.copyWith(
+                                color: theme.colors.foreground,
+                                fontWeight: FontWeight.w700,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              currentSong.artist ?? '未知艺术家',
+                              style: theme.typography.body.sm.copyWith(
+                                color: theme.colors.mutedForeground,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
                         ),
-                        Text(
-                          currentSong.artist ?? '未知艺术家',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[600],
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
+                      ),
+                      FButton.icon(
+                        variant: FButtonVariant.ghost,
+                        size: FButtonSizeVariant.sm,
+                        onPress: () => Navigator.pop(context),
+                        child: const Icon(FLucideIcons.x),
+                      ),
+                    ],
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: LyricsWidget(
+                      artist: currentSong.artist,
+                      title: currentSong.title,
+                    ),
                   ),
                 ],
               ),
-              const Divider(),
-              Expanded(
-                child: LyricsWidget(
-                  artist: currentSong.artist,
-                  title: currentSong.title,
-                ),
-              ),
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       ),
     );
   }
 
   void _showSleepTimerDialog(BuildContext context) {
-    showDialog(
+    showFDialog(
       context: context,
-      builder: (context) => Consumer(
+      builder: (context, style, animation) => Consumer(
         builder: (context, ref, child) {
           final sleepTimerState = ref.watch(sleepTimerControllerProvider);
           final sleepTimerController =
               ref.read(sleepTimerControllerProvider.notifier);
           final isRunning = sleepTimerState.isRunning;
 
-          return AlertDialog(
-            title: const Text('睡眠定时器'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (isRunning) ...[
-                  Text(
-                    '定时器正在运行',
-                    style: TextStyle(color: Colors.grey[600]),
-                  ),
+          return FDialog(
+            animation: animation,
+            builder: (context, style) => Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('睡眠定时器', style: style.titleTextStyle),
                   const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () {
-                      sleepTimerController.cancel();
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('已取消睡眠定时器')),
-                      );
-                    },
-                    child: const Text('取消定时器'),
+                  if (isRunning) ...[
+                    Text('定时器正在运行', style: style.bodyTextStyle),
+                    const SizedBox(height: 12),
+                    FButton(
+                      variant: FButtonVariant.destructive,
+                      onPress: () {
+                        sleepTimerController.cancel();
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('已取消睡眠定时器')),
+                        );
+                      },
+                      child: const Text('取消定时器'),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  FTile(
+                    prefix: const Icon(FLucideIcons.timer),
+                    title: const Text('15 分钟'),
+                    onPress: () =>
+                        _setSleepTimer(context, const Duration(minutes: 15)),
                   ),
-                  const SizedBox(height: 8),
+                  FTile(
+                    prefix: const Icon(FLucideIcons.timer),
+                    title: const Text('30 分钟'),
+                    onPress: () =>
+                        _setSleepTimer(context, const Duration(minutes: 30)),
+                  ),
+                  FTile(
+                    prefix: const Icon(FLucideIcons.timer),
+                    title: const Text('45 分钟'),
+                    onPress: () =>
+                        _setSleepTimer(context, const Duration(minutes: 45)),
+                  ),
+                  FTile(
+                    prefix: const Icon(FLucideIcons.timer),
+                    title: const Text('60 分钟'),
+                    onPress: () =>
+                        _setSleepTimer(context, const Duration(minutes: 60)),
+                  ),
                 ],
-                ListTile(
-                  title: const Text('15 分钟'),
-                  onTap: () =>
-                      _setSleepTimer(context, const Duration(minutes: 15)),
-                ),
-                ListTile(
-                  title: const Text('30 分钟'),
-                  onTap: () =>
-                      _setSleepTimer(context, const Duration(minutes: 30)),
-                ),
-                ListTile(
-                  title: const Text('45 分钟'),
-                  onTap: () =>
-                      _setSleepTimer(context, const Duration(minutes: 45)),
-                ),
-                ListTile(
-                  title: const Text('60 分钟'),
-                  onTap: () =>
-                      _setSleepTimer(context, const Duration(minutes: 60)),
-                ),
-              ],
+              ),
             ),
           );
         },

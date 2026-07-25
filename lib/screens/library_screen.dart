@@ -99,40 +99,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
     AsyncValue playlistsAsync,
     AsyncValue<Map<String, int>> statsAsync,
   ) {
-    return Scaffold(
-      body: CustomScrollView(
+    return FScaffold(
+      childPad: false,
+      header: _buildHeader(_getTypeTitle(type), showAdd: type == 'music'),
+      child: CustomScrollView(
         slivers: [
-          // 顶部应用栏
-          SliverAppBar(
-            floating: true,
-            title: Text(
-              _getTypeTitle(type),
-              style: const TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            actions: [
-              if (type == 'music')
-                IconButton(
-                  icon: const Icon(Icons.add),
-                  onPressed: () {
-                    context.push('/playlist-management');
-                  },
-                ),
-              IconButton(
-                icon: const Icon(Icons.settings_outlined),
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const SettingsScreen(),
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
-
           // 根据类型显示不同内容
           ..._buildTypeContent(type, playlistsAsync, statsAsync),
 
@@ -146,64 +117,60 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
     AsyncValue playlistsAsync,
     AsyncValue<Map<String, int>> statsAsync,
   ) {
-    return Scaffold(
-      body: NestedScrollView(
-        headerSliverBuilder: (context, innerBoxIsScrolled) {
-          return [
-            // 顶部应用栏
-            SliverAppBar(
-              floating: true,
-              pinned: true,
-              title: const Text(
-                '音乐库',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.add),
-                  onPressed: () {
-                    context.push('/playlist-management');
-                  },
-                ),
-                IconButton(
-                  icon: const Icon(Icons.settings_outlined),
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => const SettingsScreen(),
-                      ),
-                    );
-                  },
-                ),
-              ],
-              bottom: _tabController != null
-                  ? TabBar(
-                      controller: _tabController,
-                      tabs: _enabledTabs.map((type) {
-                        return Tab(text: _getTypeTitle(type));
-                      }).toList(),
-                    )
-                  : null,
+    return FScaffold(
+      childPad: false,
+      header: _buildHeader('音乐库', showAdd: true),
+      child: Column(
+        children: [
+          if (_tabController != null)
+            TabBar(
+              controller: _tabController,
+              tabs: _enabledTabs.map((type) {
+                return Tab(text: _getTypeTitle(type));
+              }).toList(),
             ),
-          ];
-        },
-        body: _tabController != null
-            ? TabBarView(
-                controller: _tabController,
-                children: _enabledTabs.map((type) {
-                  return CustomScrollView(
-                    slivers: [
-                      ..._buildTypeContent(type, playlistsAsync, statsAsync),
-                      const SliverToBoxAdapter(child: SizedBox(height: 150)),
-                    ],
-                  );
-                }).toList(),
-              )
-            : const SizedBox(),
+          Expanded(
+            child: _tabController != null
+                ? TabBarView(
+                    controller: _tabController,
+                    children: _enabledTabs.map((type) {
+                      return CustomScrollView(
+                        slivers: [
+                          ..._buildTypeContent(
+                              type, playlistsAsync, statsAsync),
+                          const SliverToBoxAdapter(
+                              child: SizedBox(height: 150)),
+                        ],
+                      );
+                    }).toList(),
+                  )
+                : const SizedBox(),
+          ),
+        ],
       ),
+    );
+  }
+
+  FHeader _buildHeader(String title, {required bool showAdd}) {
+    return FHeader.nested(
+      title: Text(title),
+      suffixes: [
+        if (showAdd)
+          FHeaderAction(
+            icon: const Icon(FLucideIcons.plus),
+            onPress: () => context.push('/playlist-management'),
+          ),
+        FHeaderAction(
+          icon: const Icon(FLucideIcons.settings),
+          onPress: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => const SettingsScreen(),
+              ),
+            );
+          },
+        ),
+      ],
     );
   }
 
@@ -658,7 +625,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
 
   Widget _buildPlaylistItem(BuildContext context, playlist) {
     return FTile(
-      prefix: SizedBox.square(
+      prefix: const SizedBox.square(
         dimension: 56,
         child: ChansonCoverArt(
           fallbackIcon: FLucideIcons.listMusic,

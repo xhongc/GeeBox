@@ -154,29 +154,47 @@ class PlayQueueScreen extends ConsumerWidget {
   }
 
   void _showClearQueueDialog(BuildContext context, WidgetRef ref) {
-    showDialog(
+    showFDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('清空队列'),
-        content: const Text('确定要清空播放队列吗？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
+      builder: (context, style, animation) => FDialog(
+        animation: animation,
+        builder: (context, style) => Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('清空队列', style: style.titleTextStyle),
+              const SizedBox(height: 8),
+              Text('确定要清空播放队列吗？', style: style.bodyTextStyle),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  FButton(
+                    variant: FButtonVariant.outline,
+                    onPress: () => Navigator.pop(context),
+                    child: const Text('取消'),
+                  ),
+                  const SizedBox(width: 8),
+                  FButton(
+                    variant: FButtonVariant.destructive,
+                    onPress: () {
+                      final audioService = ref.read(audioPlayerServiceProvider);
+                      audioService.clearQueue();
+                      Navigator.pop(context);
+                      Navigator.pop(context); // 关闭队列页面
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('已清空播放队列')),
+                      );
+                    },
+                    child: const Text('确定'),
+                  ),
+                ],
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () {
-              final audioService = ref.read(audioPlayerServiceProvider);
-              audioService.clearQueue();
-              Navigator.pop(context);
-              Navigator.pop(context); // 关闭队列页面
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('已清空播放队列')),
-              );
-            },
-            child: const Text('确定'),
-          ),
-        ],
+        ),
       ),
     );
   }

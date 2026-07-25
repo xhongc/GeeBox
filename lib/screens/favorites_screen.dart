@@ -68,13 +68,14 @@ class FavoritesScreen extends ConsumerWidget {
     showModalBottomSheet(
       context: context,
       builder: (_) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.favorite, color: Colors.red),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          child: FCard(
+            child: FTile(
+              variant: FItemVariant.destructive,
+              prefix: const Icon(FLucideIcons.heartOff),
               title: const Text('取消收藏'),
-              onTap: () async {
+              onPress: () async {
                 final messenger = ScaffoldMessenger.of(context);
                 Navigator.pop(context);
                 final service = ref.read(favoriteServiceProvider);
@@ -85,7 +86,7 @@ class FavoritesScreen extends ConsumerWidget {
                 );
               },
             ),
-          ],
+          ),
         ),
       ),
     );

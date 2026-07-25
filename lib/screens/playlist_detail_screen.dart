@@ -253,91 +253,122 @@ class PlaylistDetailScreen extends ConsumerWidget {
     final descriptionController =
         TextEditingController(text: playlist.description ?? '');
 
-    showDialog(
+    showFDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('编辑播放列表'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(labelText: '名称'),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: descriptionController,
-              decoration: const InputDecoration(labelText: '描述（可选）'),
-              maxLines: 3,
-            ),
-          ],
+      builder: (context, style, animation) => FDialog(
+        animation: animation,
+        builder: (context, style) => Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('编辑播放列表', style: style.titleTextStyle),
+              const SizedBox(height: 18),
+              FTextField(
+                control: FTextFieldControl.managed(controller: nameController),
+                label: const Text('名称'),
+              ),
+              const SizedBox(height: 14),
+              FTextField(
+                control: FTextFieldControl.managed(
+                  controller: descriptionController,
+                ),
+                label: const Text('描述（可选）'),
+                maxLines: 3,
+              ),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  FButton(
+                    variant: FButtonVariant.outline,
+                    onPress: () => Navigator.pop(context),
+                    child: const Text('取消'),
+                  ),
+                  const SizedBox(width: 8),
+                  FButton(
+                    onPress: () async {
+                      final name = nameController.text.trim();
+                      if (name.isEmpty) return;
+
+                      final service = ref.read(playlistServiceProvider);
+                      final updatedPlaylist = playlist.copyWith(
+                        name: name,
+                        description: descriptionController.text.trim().isEmpty
+                            ? null
+                            : descriptionController.text.trim(),
+                      );
+                      await service.updatePlaylist(updatedPlaylist);
+
+                      refreshPlaylist(ref, playlistId);
+                      refreshPlaylists(ref);
+
+                      if (context.mounted) {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('已更新播放列表')),
+                        );
+                      }
+                    },
+                    child: const Text('保存'),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () async {
-              final name = nameController.text.trim();
-              if (name.isEmpty) return;
-
-              final service = ref.read(playlistServiceProvider);
-              final updatedPlaylist = playlist.copyWith(
-                name: name,
-                description: descriptionController.text.trim().isEmpty
-                    ? null
-                    : descriptionController.text.trim(),
-              );
-              await service.updatePlaylist(updatedPlaylist);
-
-              refreshPlaylist(ref, playlistId);
-              refreshPlaylists(ref);
-
-              if (context.mounted) {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('已更新播放列表')),
-                );
-              }
-            },
-            child: const Text('保存'),
-          ),
-        ],
       ),
     );
   }
 
   void _showDeleteDialog(BuildContext context, WidgetRef ref, playlist) {
-    showDialog(
+    showFDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('删除播放列表'),
-        content: Text('确定要删除播放列表"${playlist.name}"吗？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () async {
-              final service = ref.read(playlistServiceProvider);
-              await service.deletePlaylist(playlistId);
+      builder: (context, style, animation) => FDialog(
+        animation: animation,
+        builder: (context, style) => Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('删除播放列表', style: style.titleTextStyle),
+              const SizedBox(height: 8),
+              Text('确定要删除播放列表"${playlist.name}"吗？', style: style.bodyTextStyle),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  FButton(
+                    variant: FButtonVariant.outline,
+                    onPress: () => Navigator.pop(context),
+                    child: const Text('取消'),
+                  ),
+                  const SizedBox(width: 8),
+                  FButton(
+                    variant: FButtonVariant.destructive,
+                    onPress: () async {
+                      final service = ref.read(playlistServiceProvider);
+                      await service.deletePlaylist(playlistId);
 
-              refreshPlaylists(ref);
+                      refreshPlaylists(ref);
 
-              if (context.mounted) {
-                Navigator.pop(context);
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('已删除: ${playlist.name}')),
-                );
-              }
-            },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('删除'),
+                      if (context.mounted) {
+                        Navigator.pop(context);
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('已删除: ${playlist.name}')),
+                        );
+                      }
+                    },
+                    child: const Text('删除'),
+                  ),
+                ],
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -363,7 +394,7 @@ class _PlaylistHero extends StatelessWidget {
         padding: const EdgeInsets.all(18),
         child: Row(
           children: [
-            SizedBox.square(
+            const SizedBox.square(
               dimension: 92,
               child: ChansonCoverArt(
                 fallbackIcon: FLucideIcons.listMusic,

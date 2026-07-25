@@ -55,9 +55,8 @@ class ThemeSettingsNotifier extends StateNotifier<ThemeSettings> {
 
     // 加载主题色
     final colorValue = prefs.getInt(_seedColorKey);
-    final seedColor = colorValue != null
-        ? Color(colorValue)
-        : const Color(0xFF1DB954);
+    final seedColor =
+        colorValue != null ? Color(colorValue) : const Color(0xFF1DB954);
 
     state = ThemeSettings(mode: mode, seedColor: seedColor);
   }
@@ -73,7 +72,7 @@ class ThemeSettingsNotifier extends StateNotifier<ThemeSettings> {
   Future<void> setSeedColor(Color color) async {
     state = state.copyWith(seedColor: color);
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_seedColorKey, color.value);
+    await prefs.setInt(_seedColorKey, color.toARGB32());
   }
 }
 
