@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:forui/forui.dart';
 import '../providers/play_history_provider.dart';
 import '../providers/audio_player_provider.dart';
 import '../providers/subsonic_provider.dart';
 import '../providers/music_repository_provider.dart';
 import '../models/song.dart';
 import '../widgets/error_view.dart';
+import '../widgets/forui_components.dart';
 
 /// 最近播放页面
 class PlayHistoryScreen extends ConsumerWidget {
@@ -14,37 +16,23 @@ class PlayHistoryScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final recentlyPlayed = ref.watch(recentlyPlayedProvider);
-    final theme = Theme.of(context);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('最近播放'),
-      ),
-      body: recentlyPlayed.when(
+    return ChansonScaffold(
+      title: '最近播放',
+      child: recentlyPlayed.when(
         data: (songs) {
           if (songs.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.history, size: 64, color: Colors.grey[400]),
-                  const SizedBox(height: 16),
-                  Text(
-                    '还没有播放记录',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ],
-              ),
+            return const ChansonEmptyState(
+              icon: FLucideIcons.history,
+              message: '还没有播放记录',
             );
           }
 
           return ListView.builder(
+            padding: const EdgeInsets.symmetric(vertical: 8),
             itemCount: songs.length,
             itemBuilder: (context, index) {
-              return _buildSongItem(context, ref, songs[index], theme);
+              return _buildSongItem(context, ref, songs[index]);
             },
           );
         },
@@ -56,47 +44,17 @@ class PlayHistoryScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildSongItem(BuildContext context, WidgetRef ref, Song song, ThemeData theme) {
+  Widget _buildSongItem(BuildContext context, WidgetRef ref, Song song) {
     final repository = ref.read(musicRepositoryProvider);
 
-    return ListTile(
-      leading: Container(
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          color: Colors.grey[300],
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: song.coverArt != null
-            ? ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: Image.network(
-                  repository.getCoverArtUrl(song.coverArt!),
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return const Icon(Icons.music_note, color: Colors.grey);
-                  },
-                ),
-              )
-            : const Icon(Icons.music_note, color: Colors.grey),
-      ),
-      title: Text(
-        song.title,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      subtitle: Text(
-        song.artist ?? '未知艺术家',
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      trailing: song.duration != null
-          ? Text(
-              _formatDuration(song.duration!),
-              style: TextStyle(color: Colors.grey[600]),
-            )
-          : null,
-      onTap: () {
+    return ChansonSongTile(
+      coverUrl: song.coverArt == null
+          ? null
+          : repository.getCoverArtUrl(song.coverArt!),
+      title: song.title,
+      subtitle: song.artist ?? '未知艺术家',
+      duration: song.duration == null ? null : _formatDuration(song.duration!),
+      onPress: () {
         final audioService = ref.read(audioPlayerServiceProvider);
         final subsonicService = ref.read(subsonicServiceProvider);
         final streamUrl = subsonicService.getStreamUrl(song.id);

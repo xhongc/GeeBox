@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 import '../models/song.dart';
 import '../models/album.dart';
+import '../providers/music_repository_provider.dart';
 import '../providers/search_provider.dart';
 import '../providers/audio_player_provider.dart';
 import '../providers/subsonic_provider.dart';
 import '../services/search_service.dart';
 import '../widgets/add_to_playlist_dialog.dart';
 import '../widgets/error_view.dart';
+import '../widgets/forui_components.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});
@@ -73,33 +76,44 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   @override
   Widget build(BuildContext context) {
     final searchResult = ref.watch(searchResultProvider);
-    final theme = Theme.of(context);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: TextField(
-          controller: _searchController,
-          autofocus: true,
-          decoration: InputDecoration(
-            hintText: '搜索歌曲、专辑、艺术家...',
-            border: InputBorder.none,
-            suffixIcon: _searchController.text.isNotEmpty
-                ? IconButton(
-                    icon: const Icon(Icons.clear),
-                    onPressed: _clearSearch,
-                  )
-                : null,
+    return ChansonScaffold(
+      title: '搜索',
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: FTextField(
+              control: FTextFieldControl.managed(
+                controller: _searchController,
+                onChange: (_) => setState(() {}),
+              ),
+              autofocus: true,
+              hint: '搜索歌曲、专辑、艺术家...',
+              prefixBuilder: (context, style, variants) =>
+                  FTextField.prefixIconBuilder(
+                context,
+                style,
+                variants,
+                const Icon(FLucideIcons.search),
+              ),
+              suffixBuilder: _searchController.text.isEmpty
+                  ? null
+                  : (context, style, variants) => FButton.icon(
+                        variant: FButtonVariant.ghost,
+                        size: FButtonSizeVariant.sm,
+                        onPress: _clearSearch,
+                        child: const Icon(FLucideIcons.x),
+                      ),
+              onSubmit: _performSearch,
+            ),
           ),
-          onSubmitted: _performSearch,
-          onChanged: (value) {
-            setState(() {});
-          },
-        ),
-        actions: [
           if (_isSearching)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.all(16.0),
+            const Padding(
+              padding: EdgeInsets.only(bottom: 8),
+              child: SizedBox(
+                width: 20,
+                height: 20,
                 child: SizedBox(
                   width: 20,
                   height: 20,
@@ -107,13 +121,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 ),
               ),
             ),
+          Expanded(child: _buildBody(searchResult)),
         ],
       ),
-      body: _buildBody(searchResult, theme),
     );
   }
 
-  Widget _buildBody(SearchResult? searchResult, ThemeData theme) {
+  Widget _buildBody(SearchResult? searchResult) {
     if (searchResult == null) {
       return _buildSearchHistory();
     }
@@ -123,25 +137,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     }
 
     if (searchResult.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
-            const SizedBox(height: 16),
-            Text(
-              '没有找到相关结果',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey[600],
-              ),
-            ),
-          ],
-        ),
+      return const ChansonEmptyState(
+        icon: FLucideIcons.searchX,
+        message: '没有找到相关结果',
       );
     }
 
-    return _buildSearchResults(searchResult, theme);
+    return _buildSearchResults(searchResult);
   }
 
   Widget _buildSearchHistory() {
@@ -151,21 +153,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     return historyAsync.when(
       data: (history) {
         if (history.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.history, size: 64, color: Colors.grey[400]),
-                const SizedBox(height: 16),
-                Text(
-                  '暂无搜索历史',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey[600],
-                  ),
-                ),
-              ],
-            ),
+          return const ChansonEmptyState(
+            icon: FLucideIcons.history,
+            message: '暂无搜索历史',
           );
         }
 
@@ -177,15 +167,16 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
+                  Text(
                     '搜索历史',
-                    style: TextStyle(
-                      fontSize: 18,
+                    style: context.theme.typography.body.lg.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  TextButton(
-                    onPressed: () async {
+                  FButton(
+                    variant: FButtonVariant.ghost,
+                    size: FButtonSizeVariant.sm,
+                    onPress: () async {
                       await searchService.clearSearchHistory();
                       ref.invalidate(searchHistoryProvider);
                     },
@@ -199,17 +190,19 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 itemCount: history.length,
                 itemBuilder: (context, index) {
                   final item = history[index];
-                  return ListTile(
-                    leading: const Icon(Icons.history),
+                  return FTile(
+                    prefix: const Icon(FLucideIcons.history),
                     title: Text(item.query),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.close, size: 20),
-                      onPressed: () async {
+                    suffix: FButton.icon(
+                      variant: FButtonVariant.ghost,
+                      size: FButtonSizeVariant.sm,
+                      onPress: () async {
                         await searchService.deleteSearchHistory(item.query);
                         ref.invalidate(searchHistoryProvider);
                       },
+                      child: const Icon(FLucideIcons.x),
                     ),
-                    onTap: () {
+                    onPress: () {
                       _searchController.text = item.query;
                       _performSearch(item.query);
                     },
@@ -227,75 +220,42 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     );
   }
 
-  Widget _buildSearchResults(SearchResult searchResult, ThemeData theme) {
+  Widget _buildSearchResults(SearchResult searchResult) {
     return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
       children: [
         if (searchResult.songs.isNotEmpty) ...[
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Text(
-              '歌曲 (${searchResult.songs.length})',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+          ChansonSection(
+            title: '歌曲 (${searchResult.songs.length})',
+            children: [
+              ...searchResult.songs.map(_buildSongItem),
+            ],
           ),
-          ...searchResult.songs.map((song) => _buildSongItem(song, theme)),
         ],
         if (searchResult.albums.isNotEmpty) ...[
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Text(
-              '专辑 (${searchResult.albums.length})',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+          ChansonSection(
+            title: '专辑 (${searchResult.albums.length})',
+            children: [
+              ...searchResult.albums.map(_buildAlbumItem),
+            ],
           ),
-          ...searchResult.albums.map((album) => _buildAlbumItem(album, theme)),
         ],
-        const SizedBox(height: 100),
       ],
     );
   }
 
-  Widget _buildSongItem(Song song, ThemeData theme) {
-    return ListTile(
-      leading: Container(
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          color: Colors.grey[300],
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: const Icon(Icons.music_note, color: Colors.grey),
-      ),
-      title: Text(
-        song.title,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      subtitle: Text(
-        song.artist ?? '未知艺术家',
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            _formatDuration(song.duration ?? 0),
-            style: TextStyle(color: Colors.grey[600]),
-          ),
-          IconButton(
-            icon: const Icon(Icons.more_vert, size: 20),
-            onPressed: () => _showSongOptions(song),
-          ),
-        ],
-      ),
-      onTap: () {
+  Widget _buildSongItem(Song song) {
+    final repository = ref.read(musicRepositoryProvider);
+
+    return ChansonSongTile(
+      coverUrl: song.coverArt == null
+          ? null
+          : repository.getCoverArtUrl(song.coverArt!),
+      title: song.title,
+      subtitle: song.artist ?? '未知艺术家',
+      duration: _formatDuration(song.duration ?? 0),
+      onMore: () => _showSongOptions(song),
+      onPress: () {
         final audioService = ref.read(audioPlayerServiceProvider);
         final subsonicService = ref.read(subsonicServiceProvider);
         final streamUrl = subsonicService.getStreamUrl(song.id);
@@ -326,16 +286,18 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     );
   }
 
-  Widget _buildAlbumItem(Album album, ThemeData theme) {
-    return ListTile(
-      leading: Container(
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          color: Colors.grey[300],
-          borderRadius: BorderRadius.circular(4),
+  Widget _buildAlbumItem(Album album) {
+    final repository = ref.read(musicRepositoryProvider);
+
+    return FTile(
+      prefix: SizedBox.square(
+        dimension: 46,
+        child: ChansonCoverArt(
+          imageUrl: album.coverArt == null
+              ? null
+              : repository.getCoverArtUrl(album.coverArt!),
+          fallbackIcon: FLucideIcons.disc3,
         ),
-        child: const Icon(Icons.album, color: Colors.grey),
       ),
       title: Text(
         album.name,
@@ -347,11 +309,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
-      trailing: Text(
-        '${album.songCount ?? 0} 首',
-        style: TextStyle(color: Colors.grey[600]),
-      ),
-      onTap: () {
+      details: Text('${album.songCount ?? 0} 首'),
+      suffix: const Icon(FLucideIcons.chevronRight),
+      onPress: () {
         context.push('/album-detail', extra: {
           'albumId': album.id,
           'albumName': album.name,

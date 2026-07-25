@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:forui/forui.dart';
 import '../exceptions/subsonic_exceptions.dart';
+import 'forui_components.dart';
 
 /// 通用错误展示 Widget
 class ErrorView extends StatelessWidget {
@@ -16,7 +18,6 @@ class ErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final (icon, title, message) = _getErrorInfo();
 
     return Center(
@@ -28,28 +29,20 @@ class ErrorView extends StatelessWidget {
             Icon(
               icon,
               size: 64,
-              color: theme.colorScheme.error,
+              color: context.theme.colors.destructive,
             ),
             const SizedBox(height: 16),
-            Text(
-              title,
-              style: theme.textTheme.titleLarge,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              customMessage ?? message,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-              textAlign: TextAlign.center,
+            ChansonAlert(
+              title: title,
+              message: customMessage ?? message,
+              variant: FAlertVariant.destructive,
             ),
             if (onRetry != null) ...[
               const SizedBox(height: 24),
-              FilledButton.icon(
-                onPressed: onRetry,
-                icon: const Icon(Icons.refresh),
-                label: const Text('重试'),
+              FButton(
+                onPress: onRetry,
+                prefix: const Icon(FLucideIcons.refreshCw),
+                child: const Text('重试'),
               ),
             ],
           ],
@@ -61,39 +54,39 @@ class ErrorView extends StatelessWidget {
   (IconData, String, String) _getErrorInfo() {
     if (error is NetworkException) {
       return (
-        Icons.wifi_off,
+        FLucideIcons.wifiOff,
         '网络错误',
         error.toString(),
       );
     } else if (error is AuthenticationException) {
       return (
-        Icons.lock_outline,
+        FLucideIcons.lock,
         '认证失败',
         '用户名或密码错误，请重新登录',
       );
     } else if (error is NotConfiguredException) {
       return (
-        Icons.settings_outlined,
+        FLucideIcons.settings,
         '未配置服务器',
         '请先配置服务器连接信息',
       );
     } else if (error is ServerException) {
       final serverError = error as ServerException;
       return (
-        Icons.error_outline,
+        FLucideIcons.serverCrash,
         '服务器错误',
         '错误代码: ${serverError.statusCode}\n${serverError.message}',
       );
     } else if (error is ParseException) {
       return (
-        Icons.warning_outlined,
+        FLucideIcons.triangleAlert,
         '数据解析失败',
         error.toString(),
       );
     }
 
     return (
-      Icons.error_outline,
+      FLucideIcons.circleAlert,
       '未知错误',
       error.toString(),
     );

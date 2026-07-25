@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:forui/forui.dart';
 import '../providers/favorite_provider.dart';
 import '../providers/audio_player_provider.dart';
 import '../providers/subsonic_provider.dart';
 import '../providers/music_repository_provider.dart';
 import '../models/song.dart';
 import '../widgets/error_view.dart';
+import '../widgets/forui_components.dart';
 
 /// 我喜欢的音乐页面
 class FavoritesScreen extends ConsumerWidget {
@@ -14,37 +16,23 @@ class FavoritesScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final starredSongs = ref.watch(starredSongsProvider);
-    final theme = Theme.of(context);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('我喜欢的音乐'),
-      ),
-      body: starredSongs.when(
+    return ChansonScaffold(
+      title: '我喜欢的音乐',
+      child: starredSongs.when(
         data: (songs) {
           if (songs.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.favorite_border, size: 64, color: Colors.grey[400]),
-                  const SizedBox(height: 16),
-                  Text(
-                    '还没有收藏任何歌曲',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ],
-              ),
+            return const ChansonEmptyState(
+              icon: FLucideIcons.heart,
+              message: '还没有收藏任何歌曲',
             );
           }
 
           return ListView.builder(
+            padding: const EdgeInsets.symmetric(vertical: 8),
             itemCount: songs.length,
             itemBuilder: (context, index) {
-              return _buildSongItem(context, ref, songs[index], theme);
+              return _buildSongItem(context, ref, songs[index]);
             },
           );
         },
@@ -56,55 +44,18 @@ class FavoritesScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildSongItem(BuildContext context, WidgetRef ref, Song song, ThemeData theme) {
+  Widget _buildSongItem(BuildContext context, WidgetRef ref, Song song) {
     final repository = ref.read(musicRepositoryProvider);
 
-    return ListTile(
-      leading: Container(
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          color: Colors.grey[300],
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: song.coverArt != null
-            ? ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: Image.network(
-                  repository.getCoverArtUrl(song.coverArt!),
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return const Icon(Icons.music_note, color: Colors.grey);
-                  },
-                ),
-              )
-            : const Icon(Icons.music_note, color: Colors.grey),
-      ),
-      title: Text(
-        song.title,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      subtitle: Text(
-        song.artist ?? '未知艺术家',
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (song.duration != null)
-            Text(
-              _formatDuration(song.duration!),
-              style: TextStyle(color: Colors.grey[600]),
-            ),
-          IconButton(
-            icon: const Icon(Icons.more_vert, size: 20),
-            onPressed: () => _showSongOptions(context, ref, song),
-          ),
-        ],
-      ),
-      onTap: () {
+    return ChansonSongTile(
+      coverUrl: song.coverArt == null
+          ? null
+          : repository.getCoverArtUrl(song.coverArt!),
+      title: song.title,
+      subtitle: song.artist ?? '未知艺术家',
+      duration: song.duration == null ? null : _formatDuration(song.duration!),
+      onMore: () => _showSongOptions(context, ref, song),
+      onPress: () {
         final audioService = ref.read(audioPlayerServiceProvider);
         final subsonicService = ref.read(subsonicServiceProvider);
         final streamUrl = subsonicService.getStreamUrl(song.id);

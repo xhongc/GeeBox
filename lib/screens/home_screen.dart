@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/music_repository_provider.dart';
 import '../providers/media_type_settings_provider.dart';
 import '../models/album.dart';
 import '../widgets/error_view.dart';
+import '../widgets/forui_components.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -161,7 +163,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               ),
             ),
-
             recentAlbumsAsync.when(
               data: (albums) {
                 if (albums.isEmpty) {
@@ -206,7 +207,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               ),
             ),
-
             const SliverToBoxAdapter(child: SizedBox(height: 32)),
           ],
 
@@ -233,7 +233,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               ),
             ),
-
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.all(32),
@@ -258,7 +257,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               ),
             ),
-
             const SliverToBoxAdapter(child: SizedBox(height: 32)),
           ],
 
@@ -285,7 +283,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               ),
             ),
-
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.all(32),
@@ -310,7 +307,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               ),
             ),
-
             const SliverToBoxAdapter(child: SizedBox(height: 32)),
           ],
 
@@ -337,7 +333,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               ),
             ),
-
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.all(32),
@@ -362,7 +357,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               ),
             ),
-
             const SliverToBoxAdapter(child: SizedBox(height: 32)),
           ],
 
@@ -391,7 +385,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               ),
             ),
-
             randomAlbumsAsync.when(
               data: (albums) {
                 if (albums.isEmpty) {
@@ -462,22 +455,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     Color color,
     VoidCallback? onTap,
   ) {
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Container(
+    return FCard(
+      child: FTappable(
+        onPress: onTap,
+        builder: (context, variants, child) => Padding(
           padding: const EdgeInsets.all(12),
           child: Row(
             children: [
-              Container(
-                width: 48,
-                height: 48,
+              DecoratedBox(
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.2),
+                  color: color.withValues(alpha: 0.16),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(icon, color: color),
+                child: SizedBox.square(
+                  dimension: 48,
+                  child: Icon(icon, color: color),
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -501,11 +494,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _buildAlbumCard(BuildContext context, Album album) {
     final repository = ref.read(musicRepositoryProvider);
 
-    return Container(
+    return SizedBox(
       width: 160,
-      margin: const EdgeInsets.only(right: 16),
-      child: InkWell(
-        onTap: () {
+      child: ChansonGridCard(
+        imageUrl: album.coverArt == null
+            ? null
+            : repository.getCoverArtUrl(album.coverArt!),
+        title: album.name,
+        subtitle: album.artist ?? '未知艺术家',
+        fallbackIcon: FLucideIcons.disc3,
+        onPress: () {
           context.push('/album-detail', extra: {
             'albumId': album.id,
             'albumName': album.name,
@@ -513,66 +511,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             'coverArtId': album.coverArt,
           });
         },
-        borderRadius: BorderRadius.circular(8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 封面
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: album.coverArt != null
-                  ? Image.network(
-                      repository.getCoverArtUrl(album.coverArt!),
-                      width: 160,
-                      height: 160,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          width: 160,
-                          height: 160,
-                          color: Colors.grey[300],
-                          child: const Icon(
-                            Icons.album,
-                            size: 64,
-                            color: Colors.grey,
-                          ),
-                        );
-                      },
-                    )
-                  : Container(
-                      width: 160,
-                      height: 160,
-                      color: Colors.grey[300],
-                      child: const Icon(
-                        Icons.album,
-                        size: 64,
-                        color: Colors.grey,
-                      ),
-                    ),
-            ),
-            const SizedBox(height: 8),
-            // 标题
-            Text(
-              album.name,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            // 艺术家
-            Text(
-              album.artist ?? '未知艺术家',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[600],
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
       ),
     );
   }

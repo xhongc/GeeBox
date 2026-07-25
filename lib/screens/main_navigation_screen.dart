@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:forui/forui.dart';
 import 'home_screen.dart';
 import 'discover_screen.dart';
 import 'library_screen.dart';
@@ -33,53 +34,40 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Stack(
+    return FScaffold(
+      childPad: false,
+      footer: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // 主内容
-          IndexedStack(
+          MiniPlayer(onTap: _openPlayer),
+          FBottomNavigationBar(
             index: _currentIndex,
-            children: _screens,
-          ),
-
-          // 底部迷你播放器
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                MiniPlayer(onTap: _openPlayer),
-                NavigationBar(
-                  selectedIndex: _currentIndex,
-                  onDestinationSelected: (index) {
-                    setState(() {
-                      _currentIndex = index;
-                    });
-                  },
-                  destinations: const [
-                    NavigationDestination(
-                      icon: Icon(Icons.home_outlined),
-                      selectedIcon: Icon(Icons.home),
-                      label: '首页',
-                    ),
-                    NavigationDestination(
-                      icon: Icon(Icons.explore_outlined),
-                      selectedIcon: Icon(Icons.explore),
-                      label: '发现',
-                    ),
-                    NavigationDestination(
-                      icon: Icon(Icons.library_music_outlined),
-                      selectedIcon: Icon(Icons.library_music),
-                      label: '我的音乐',
-                    ),
-                  ],
-                ),
-              ],
-            ),
+            safeAreaBottom: true,
+            onChange: (index) {
+              setState(() {
+                _currentIndex = index;
+              });
+            },
+            children: const [
+              FBottomNavigationBarItem(
+                icon: Icon(FLucideIcons.house),
+                label: Text('首页'),
+              ),
+              FBottomNavigationBarItem(
+                icon: Icon(FLucideIcons.compass),
+                label: Text('发现'),
+              ),
+              FBottomNavigationBarItem(
+                icon: Icon(FLucideIcons.library),
+                label: Text('我的音乐'),
+              ),
+            ],
           ),
         ],
+      ),
+      child: IndexedStack(
+        index: _currentIndex,
+        children: _screens,
       ),
     );
   }

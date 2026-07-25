@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:forui/forui.dart';
 
 /// 应用主题配置
 class AppTheme {
@@ -13,6 +14,12 @@ class AppTheme {
     Color(0xFF3A86FF), // 蓝色
     Color(0xFFFF006E), // 粉红色
   ];
+
+  /// 获取 Forui 主题。Forui 当前使用预设设计令牌；Material 主题继续承接用户选择的强调色。
+  static FThemeData foruiTheme({required bool isDark}) {
+    final platformTheme = isDark ? FTheme.neutral.dark : FTheme.neutral.light;
+    return platformTheme.touch;
+  }
 
   /// 获取浅色主题
   static ThemeData lightTheme(Color seedColor) {
@@ -31,7 +38,7 @@ class AppTheme {
         backgroundColor: Colors.transparent,
         foregroundColor: colorScheme.onSurface,
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
@@ -77,7 +84,7 @@ class AppTheme {
         backgroundColor: Colors.transparent,
         foregroundColor: colorScheme.onSurface,
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),

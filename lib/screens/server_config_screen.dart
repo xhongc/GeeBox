@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hive/hive.dart';
 import '../providers/subsonic_provider.dart';
+import '../widgets/forui_components.dart';
 
 class ServerConfigScreen extends ConsumerStatefulWidget {
   const ServerConfigScreen({super.key});
@@ -12,7 +14,6 @@ class ServerConfigScreen extends ConsumerStatefulWidget {
 }
 
 class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
-  final _formKey = GlobalKey<FormState>();
   final _serverUrlController = TextEditingController();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -41,7 +42,13 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
   }
 
   Future<void> _testConnection() async {
-    if (!_formKey.currentState!.validate()) return;
+    final validationError = _validateConfig();
+    if (validationError != null) {
+      setState(() {
+        _errorMessage = validationError;
+      });
+      return;
+    }
 
     setState(() {
       _isLoading = true;
@@ -117,137 +124,134 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
     }
   }
 
+  String? _validateConfig() {
+    final serverUrl = _serverUrlController.text.trim();
+    final username = _usernameController.text.trim();
+    final password = _passwordController.text;
+
+    if (serverUrl.isEmpty) {
+      return '请输入服务器地址';
+    }
+    if (!serverUrl.startsWith('http://') && !serverUrl.startsWith('https://')) {
+      return '服务器地址必须以 http:// 或 https:// 开头';
+    }
+    if (username.isEmpty) {
+      return '请输入用户名';
+    }
+    if (password.isEmpty) {
+      return '请输入密码';
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('服务器配置'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-      ),
-      body: SingleChildScrollView(
+    final theme = context.theme;
+
+    return ChansonScaffold(
+      title: '服务器配置',
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Icon(
-                Icons.cloud,
-                size: 80,
-                color: Colors.deepPurple,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Icon(
+              FLucideIcons.serverCog,
+              size: 64,
+              color: theme.colors.primary,
+            ),
+            const SizedBox(height: 24),
+            Text(
+              '配置 Subsonic 服务器',
+              style: theme.typography.body.xl2.copyWith(
+                color: theme.colors.foreground,
+                fontWeight: FontWeight.w700,
               ),
-              const SizedBox(height: 24),
-              const Text(
-                '配置 Subsonic 服务器',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                textAlign: TextAlign.center,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '请输入您的 Subsonic 服务器信息',
+              style: theme.typography.body.sm.copyWith(
+                color: theme.colors.mutedForeground,
               ),
-              const SizedBox(height: 8),
-              const Text(
-                '请输入您的 Subsonic 服务器信息',
-                style: TextStyle(color: Colors.grey),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 32),
-              TextFormField(
-                controller: _serverUrlController,
-                decoration: const InputDecoration(
-                  labelText: '服务器地址',
-                  hintText: 'https://demo.subsonic.org',
-                  prefixIcon: Icon(Icons.link),
-                  border: OutlineInputBorder(),
-                ),
-                keyboardType: TextInputType.url,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return '请输入服务器地址';
-                  }
-                  if (!value.startsWith('http://') && !value.startsWith('https://')) {
-                    return '服务器地址必须以 http:// 或 https:// 开头';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _usernameController,
-                decoration: const InputDecoration(
-                  labelText: '用户名',
-                  prefixIcon: Icon(Icons.person),
-                  border: OutlineInputBorder(),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return '请输入用户名';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _passwordController,
-                decoration: const InputDecoration(
-                  labelText: '密码',
-                  prefixIcon: Icon(Icons.lock),
-                  border: OutlineInputBorder(),
-                ),
-                obscureText: true,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return '请输入密码';
-                  }
-                  return null;
-                },
-              ),
-              if (_errorMessage != null) ...[
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.red.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.red.shade200),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.error_outline, color: Colors.red.shade700),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _errorMessage!,
-                          style: TextStyle(color: Colors.red.shade700),
-                        ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            FCard(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    FTextField(
+                      control: FTextFieldControl.managed(
+                          controller: _serverUrlController),
+                      label: const Text('服务器地址'),
+                      hint: 'https://demo.subsonic.org',
+                      keyboardType: TextInputType.url,
+                      prefixBuilder: (context, style, variants) =>
+                          FTextField.prefixIconBuilder(
+                        context,
+                        style,
+                        variants,
+                        const Icon(FLucideIcons.link),
                       ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(height: 16),
+                    FTextField(
+                      control: FTextFieldControl.managed(
+                          controller: _usernameController),
+                      label: const Text('用户名'),
+                      prefixBuilder: (context, style, variants) =>
+                          FTextField.prefixIconBuilder(
+                        context,
+                        style,
+                        variants,
+                        const Icon(FLucideIcons.userRound),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    FTextField.password(
+                      control: FTextFieldControl.managed(
+                          controller: _passwordController),
+                      label: const Text('密码'),
+                    ),
+                  ],
                 ),
-              ],
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: _isLoading ? null : _testConnection,
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-                child: _isLoading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('测试连接', style: TextStyle(fontSize: 16)),
               ),
+            ),
+            if (_errorMessage != null) ...[
               const SizedBox(height: 16),
-              TextButton(
-                onPressed: () async {
-                  final settingsBox = Hive.box('settings');
-                  await settingsBox.put('skip_config', true);
-                  if (!context.mounted) return;
-                  context.go('/');
-                },
-                child: const Text('跳过'),
+              ChansonAlert(
+                title: '连接失败',
+                message: _errorMessage!,
+                variant: FAlertVariant.destructive,
               ),
             ],
-          ),
+            const SizedBox(height: 24),
+            FButton(
+              onPress: _isLoading ? null : _testConnection,
+              prefix: _isLoading
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(FLucideIcons.plugZap),
+              child: const Text('测试连接'),
+            ),
+            const SizedBox(height: 12),
+            FButton(
+              variant: FButtonVariant.ghost,
+              onPress: () async {
+                final settingsBox = Hive.box('settings');
+                await settingsBox.put('skip_config', true);
+                if (!context.mounted) return;
+                context.go('/');
+              },
+              child: const Text('跳过'),
+            ),
+          ],
         ),
       ),
     );

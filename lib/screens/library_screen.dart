@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/playlist_provider.dart';
 import '../providers/music_repository_provider.dart';
 import '../providers/media_type_settings_provider.dart';
 import '../widgets/error_view.dart';
+import '../widgets/forui_components.dart';
 import 'settings_screen.dart';
 
 // 音乐库统计 Provider
-final libraryStatsProvider = FutureProvider.autoDispose<Map<String, int>>((ref) async {
+final libraryStatsProvider =
+    FutureProvider.autoDispose<Map<String, int>>((ref) async {
   final repository = ref.watch(musicRepositoryProvider);
   return await repository.getLibraryStats();
 });
@@ -83,7 +86,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
 
     // 如果只有一个类型，直接显示内容，不显示 Tab
     if (_enabledTabs.length == 1) {
-      return _buildSingleTypeView(_enabledTabs.first, playlistsAsync, statsAsync);
+      return _buildSingleTypeView(
+          _enabledTabs.first, playlistsAsync, statsAsync);
     }
 
     // 如果有多个类型，显示 TabBar
@@ -585,8 +589,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
     ];
   }
 
-  Widget _buildStatCard(String label, String value, IconData icon, Color color) {
-    return Card(
+  Widget _buildStatCard(
+      String label, String value, IconData icon, Color color) {
+    return FCard(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -620,11 +625,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
     Color color,
     VoidCallback onTap,
   ) {
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Container(
+    return FCard(
+      child: FTappable(
+        onPress: onTap,
+        builder: (context, variants, child) => Container(
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
@@ -632,7 +636,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
                 width: 56,
                 height: 56,
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.2),
+                  color: color.withValues(alpha: 0.16),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(icon, color: color, size: 32),
@@ -653,26 +657,26 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
   }
 
   Widget _buildPlaylistItem(BuildContext context, playlist) {
-    return ListTile(
-      leading: Container(
-        width: 56,
-        height: 56,
-        decoration: BoxDecoration(
-          color: Colors.grey[300],
-          borderRadius: BorderRadius.circular(8),
+    return FTile(
+      prefix: SizedBox.square(
+        dimension: 56,
+        child: ChansonCoverArt(
+          fallbackIcon: FLucideIcons.listMusic,
+          borderRadius: 8,
         ),
-        child: const Icon(Icons.playlist_play, color: Colors.grey),
       ),
       title: Text(
         playlist.name,
         style: const TextStyle(fontWeight: FontWeight.w600),
       ),
       subtitle: Text('${playlist.songIds.length} 首歌曲'),
-      trailing: IconButton(
-        icon: const Icon(Icons.more_vert),
-        onPressed: () {},
+      suffix: FButton.icon(
+        variant: FButtonVariant.ghost,
+        size: FButtonSizeVariant.sm,
+        onPress: () {},
+        child: const Icon(FLucideIcons.ellipsisVertical),
       ),
-      onTap: () {
+      onPress: () {
         context.push('/playlist-detail', extra: {
           'playlistId': playlist.id,
         });

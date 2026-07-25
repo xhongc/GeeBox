@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:forui/forui.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'router/app_router.dart';
 import 'models/song.dart';
@@ -66,14 +68,32 @@ class MyApp extends ConsumerWidget {
 
     // 根据设置决定使用的主题模式
     final isDark = themeSettings.mode == AppThemeMode.dark ||
-        (themeSettings.mode == AppThemeMode.system && brightness == Brightness.dark);
+        (themeSettings.mode == AppThemeMode.system &&
+            brightness == Brightness.dark);
+
+    final foruiTheme = AppTheme.foruiTheme(isDark: isDark);
+    final platform = (defaultTargetPlatform == TargetPlatform.iOS ||
+            defaultTargetPlatform == TargetPlatform.android)
+        ? FPlatformVariant.iOS
+        : FPlatformVariant.macOS;
 
     return MaterialApp.router(
       title: 'Chanson',
       theme: AppTheme.lightTheme(themeSettings.seedColor),
       darkTheme: AppTheme.darkTheme(themeSettings.seedColor),
       themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
+      localizationsDelegates: FLocalizations.localizationsDelegates,
+      supportedLocales: FLocalizations.supportedLocales,
       routerConfig: router,
+      builder: (context, child) => FTheme(
+        data: foruiTheme,
+        platform: platform,
+        child: FToaster(
+          child: FTooltipGroup(
+            child: child ?? const SizedBox.shrink(),
+          ),
+        ),
+      ),
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:ui';
 import '../providers/audio_player_provider.dart';
@@ -9,6 +10,7 @@ import '../providers/favorite_provider.dart';
 import '../providers/play_history_provider.dart';
 import '../providers/sleep_timer_provider.dart';
 import '../services/audio_player_service.dart';
+import '../widgets/forui_components.dart';
 import '../widgets/lyrics_widget.dart';
 
 class PlayerScreen extends ConsumerStatefulWidget {
@@ -32,8 +34,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final theme = context.theme;
     final audioService = ref.watch(audioPlayerServiceProvider);
     final playerState = ref.watch(playerStateProvider);
     final position = ref.watch(positionProvider);
@@ -44,17 +45,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
     // 如果没有歌曲，返回空页面
     if (currentSong == null) {
-      return Scaffold(
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          leading: IconButton(
-            icon: const Icon(Icons.keyboard_arrow_down, size: 32),
-            onPressed: () => Navigator.pop(context),
-          ),
-        ),
-        body: const Center(
-          child: Text('暂无播放内容'),
+      return ChansonScaffold(
+        title: '正在播放',
+        onBack: () => Navigator.pop(context),
+        child: const ChansonEmptyState(
+          icon: FLucideIcons.music,
+          message: '暂无播放内容',
         ),
       );
     }
@@ -67,40 +63,35 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         : 0.0;
     final playMode = ref.watch(playModeProvider).value ?? PlayMode.sequence;
 
-    // 模拟专辑颜色
-    final albumColor = colorScheme.primary;
-
-    return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.keyboard_arrow_down, size: 32),
-          onPressed: () => Navigator.pop(context),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.timer),
-            onPressed: () {
-              _showSleepTimerDialog(context);
-            },
-            tooltip: '睡眠定时器',
+    return FScaffold(
+      childPad: false,
+      header: FHeader.nested(
+        prefixes: [
+          FHeaderAction(
+            icon: const Icon(FLucideIcons.chevronDown),
+            onPress: () => Navigator.pop(context),
           ),
-          IconButton(
-            icon: const Icon(Icons.more_vert),
-            onPressed: () {},
+        ],
+        title: const Text('正在播放'),
+        suffixes: [
+          FHeaderAction(
+            icon: const Icon(FLucideIcons.timer),
+            onPress: () => _showSleepTimerDialog(context),
+          ),
+          FHeaderAction(
+            icon: const Icon(FLucideIcons.ellipsisVertical),
+            onPress: () {},
           ),
         ],
       ),
-      body: Container(
+      child: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              albumColor.withOpacity(0.6),
-              theme.scaffoldBackgroundColor,
+              theme.colors.primary.withValues(alpha: 0.16),
+              theme.colors.background,
             ],
             stops: const [0.0, 0.5],
           ),
@@ -120,7 +111,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.3),
+                          color: Colors.black.withValues(alpha: 0.3),
                           blurRadius: 30,
                           offset: const Offset(0, 15),
                         ),
@@ -131,35 +122,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                       child: Stack(
                         children: [
                           // 封面图片
-                          currentSong.coverArt != null
-                              ? Image.network(
-                                  repository.getCoverArtUrl(currentSong.coverArt!),
-                                  fit: BoxFit.cover,
-                                  width: double.infinity,
-                                  height: double.infinity,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return Container(
-                                      color: Colors.grey[800],
-                                      child: const Center(
-                                        child: Icon(
-                                          Icons.music_note,
-                                          size: 120,
-                                          color: Colors.white54,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                )
-                              : Container(
-                                  color: Colors.grey[800],
-                                  child: const Center(
-                                    child: Icon(
-                                      Icons.music_note,
-                                      size: 120,
-                                      color: Colors.white54,
-                                    ),
-                                  ),
-                                ),
+                          ChansonCoverArt(
+                            imageUrl: currentSong.coverArt == null
+                                ? null
+                                : repository
+                                    .getCoverArtUrl(currentSong.coverArt!),
+                            fallbackIcon: FLucideIcons.music,
+                            borderRadius: 16,
+                          ),
                           // 毛玻璃效果（可选）
                           BackdropFilter(
                             filter: ImageFilter.blur(sigmaX: 0, sigmaY: 0),
@@ -190,8 +160,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                             children: [
                               Text(
                                 currentSong.title,
-                                style: theme.textTheme.headlineSmall?.copyWith(
+                                style: theme.typography.body.xl2.copyWith(
                                   fontWeight: FontWeight.bold,
+                                  color: theme.colors.foreground,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -199,8 +170,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                               const SizedBox(height: 4),
                               Text(
                                 currentSong.artist ?? '未知艺术家',
-                                style: theme.textTheme.bodyLarge?.copyWith(
-                                  color: Colors.grey[400],
+                                style: theme.typography.body.md.copyWith(
+                                  color: theme.colors.mutedForeground,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -211,18 +182,17 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                         // 收藏按钮
                         Consumer(
                           builder: (context, ref, child) {
-                            final isStarred = ref.watch(isSongStarredProvider(currentSong.id));
+                            final isStarred = ref
+                                .watch(isSongStarredProvider(currentSong.id));
 
                             return isStarred.when(
-                              data: (starred) => IconButton(
-                                icon: Icon(
-                                  starred ? Icons.favorite : Icons.favorite_border,
-                                  color: starred ? Colors.red : null,
-                                ),
-                                iconSize: 28,
-                                onPressed: () async {
-                                  final service = ref.read(favoriteServiceProvider);
-                                  final messenger = ScaffoldMessenger.of(context);
+                              data: (starred) => FButton.icon(
+                                variant: FButtonVariant.ghost,
+                                onPress: () async {
+                                  final service =
+                                      ref.read(favoriteServiceProvider);
+                                  final messenger =
+                                      ScaffoldMessenger.of(context);
                                   if (starred) {
                                     await service.unstarSong(currentSong.id);
                                     messenger.showSnackBar(
@@ -231,22 +201,32 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                                   } else {
                                     await service.starSong(currentSong.id);
                                     messenger.showSnackBar(
-                                      const SnackBar(content: Text('已添加到我喜欢的音乐')),
+                                      const SnackBar(
+                                        content: Text('已添加到我喜欢的音乐'),
+                                      ),
                                     );
                                   }
-                                  // 刷新收藏状态
                                   ref.invalidate(starredSongsProvider);
                                 },
+                                child: Icon(
+                                  starred
+                                      ? FLucideIcons.heart
+                                      : FLucideIcons.heart,
+                                  color: starred
+                                      ? theme.colors.destructive
+                                      : theme.colors.foreground,
+                                ),
                               ),
                               loading: () => const SizedBox(
                                 width: 28,
                                 height: 28,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
                               ),
-                              error: (_, __) => IconButton(
-                                icon: const Icon(Icons.favorite_border),
-                                iconSize: 28,
-                                onPressed: () {},
+                              error: (_, __) => FButton.icon(
+                                variant: FButtonVariant.ghost,
+                                onPress: () {},
+                                child: const Icon(FLucideIcons.heart),
                               ),
                             );
                           },
@@ -264,21 +244,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 32),
                 child: Column(
                   children: [
-                    SliderTheme(
-                      data: const SliderThemeData(
-                        trackHeight: 3,
-                        thumbShape: RoundSliderThumbShape(
-                          enabledThumbRadius: 6,
-                        ),
-                        overlayShape: RoundSliderOverlayShape(
-                          overlayRadius: 16,
-                        ),
-                      ),
-                      child: Slider(
-                        value: progress.clamp(0.0, 1.0),
-                        onChanged: (value) {
+                    FSlider(
+                      control: FSliderControl.liftedContinuous(
+                        value: FSliderValue(max: progress.clamp(0.0, 1.0)),
+                        onChange: (value) {
                           final newPosition = Duration(
-                            seconds: (value * totalDuration.inSeconds).toInt(),
+                            seconds:
+                                (value.max * totalDuration.inSeconds).toInt(),
                           );
                           audioService.seek(newPosition);
                         },
@@ -291,14 +263,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                         children: [
                           Text(
                             _formatDuration(currentPosition),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: Colors.grey[400],
+                            style: theme.typography.body.xs.copyWith(
+                              color: theme.colors.mutedForeground,
                             ),
                           ),
                           Text(
                             _formatDuration(totalDuration),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: Colors.grey[400],
+                            style: theme.typography.body.xs.copyWith(
+                              color: theme.colors.mutedForeground,
                             ),
                           ),
                         ],
@@ -316,80 +288,69 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    IconButton(
-                      icon: Icon(
-                        playMode == PlayMode.shuffle
-                            ? Icons.shuffle_on_outlined
-                            : Icons.shuffle,
-                        color: playMode == PlayMode.shuffle
-                            ? colorScheme.primary
-                            : null,
-                      ),
-                      iconSize: 28,
-                      onPressed: () {
+                    FButton.icon(
+                      variant: FButtonVariant.ghost,
+                      onPress: () {
                         if (playMode == PlayMode.shuffle) {
                           audioService.setPlayMode(PlayMode.sequence);
                         } else {
                           audioService.setPlayMode(PlayMode.shuffle);
                         }
                       },
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.skip_previous),
-                      iconSize: 40,
-                      onPressed: () {
-                        audioService.previous((id) => subsonicService.getStreamUrl(id));
-                      },
-                    ),
-                    Container(
-                      width: 72,
-                      height: 72,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: colorScheme.primary,
-                        boxShadow: [
-                          BoxShadow(
-                            color: colorScheme.primary.withOpacity(0.4),
-                            blurRadius: 20,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: IconButton(
-                        icon: Icon(
-                          isPlaying ? Icons.pause : Icons.play_arrow,
-                          size: 36,
-                        ),
-                        color: Colors.white,
-                        onPressed: () {
-                          audioService.playPause();
-                        },
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.skip_next),
-                      iconSize: 40,
-                      onPressed: () {
-                        audioService.next((id) => subsonicService.getStreamUrl(id));
-                      },
-                    ),
-                    IconButton(
-                      icon: Icon(
-                        playMode == PlayMode.repeatOne
-                            ? Icons.repeat_one
-                            : Icons.repeat,
-                        color: playMode == PlayMode.repeatOne
-                            ? colorScheme.primary
+                      child: Icon(
+                        playMode == PlayMode.shuffle
+                            ? FLucideIcons.shuffle
+                            : FLucideIcons.shuffle,
+                        color: playMode == PlayMode.shuffle
+                            ? theme.colors.primary
                             : null,
                       ),
-                      iconSize: 28,
-                      onPressed: () {
+                    ),
+                    FButton.icon(
+                      variant: FButtonVariant.ghost,
+                      size: FButtonSizeVariant.lg,
+                      onPress: () {
+                        audioService.previous(
+                          (id) => subsonicService.getStreamUrl(id),
+                        );
+                      },
+                      child: const Icon(FLucideIcons.skipBack),
+                    ),
+                    FButton.icon(
+                      variant: FButtonVariant.primary,
+                      size: FButtonSizeVariant.lg,
+                      onPress: audioService.playPause,
+                      child: Icon(
+                        isPlaying ? FLucideIcons.pause : FLucideIcons.play,
+                      ),
+                    ),
+                    FButton.icon(
+                      variant: FButtonVariant.ghost,
+                      size: FButtonSizeVariant.lg,
+                      onPress: () {
+                        audioService.next(
+                          (id) => subsonicService.getStreamUrl(id),
+                        );
+                      },
+                      child: const Icon(FLucideIcons.skipForward),
+                    ),
+                    FButton.icon(
+                      variant: FButtonVariant.ghost,
+                      onPress: () {
                         if (playMode == PlayMode.repeatOne) {
                           audioService.setPlayMode(PlayMode.sequence);
                         } else {
                           audioService.setPlayMode(PlayMode.repeatOne);
                         }
                       },
+                      child: Icon(
+                        playMode == PlayMode.repeatOne
+                            ? FLucideIcons.repeat1
+                            : FLucideIcons.repeat,
+                        color: playMode == PlayMode.repeatOne
+                            ? theme.colors.primary
+                            : null,
+                      ),
                     ),
                   ],
                 ),
@@ -403,22 +364,20 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    IconButton(
-                      icon: const Icon(Icons.lyrics),
-                      onPressed: () {
-                        _showLyricsDialog(context, currentSong);
-                      },
-                      tooltip: '歌词',
+                    FButton.icon(
+                      variant: FButtonVariant.ghost,
+                      onPress: () => _showLyricsDialog(context, currentSong),
+                      child: const Icon(FLucideIcons.messageSquareText),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.share),
-                      onPressed: () {},
+                    FButton.icon(
+                      variant: FButtonVariant.ghost,
+                      onPress: () {},
+                      child: const Icon(FLucideIcons.share2),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.queue_music),
-                      onPressed: () {
-                        context.push('/play-queue');
-                      },
+                    FButton.icon(
+                      variant: FButtonVariant.ghost,
+                      onPress: () => context.push('/play-queue'),
+                      child: const Icon(FLucideIcons.listMusic),
                     ),
                   ],
                 ),
@@ -502,7 +461,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       builder: (context) => Consumer(
         builder: (context, ref, child) {
           final sleepTimerState = ref.watch(sleepTimerControllerProvider);
-          final sleepTimerController = ref.read(sleepTimerControllerProvider.notifier);
+          final sleepTimerController =
+              ref.read(sleepTimerControllerProvider.notifier);
           final isRunning = sleepTimerState.isRunning;
 
           return AlertDialog(
@@ -530,19 +490,23 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                 ],
                 ListTile(
                   title: const Text('15 分钟'),
-                  onTap: () => _setSleepTimer(context, const Duration(minutes: 15)),
+                  onTap: () =>
+                      _setSleepTimer(context, const Duration(minutes: 15)),
                 ),
                 ListTile(
                   title: const Text('30 分钟'),
-                  onTap: () => _setSleepTimer(context, const Duration(minutes: 30)),
+                  onTap: () =>
+                      _setSleepTimer(context, const Duration(minutes: 30)),
                 ),
                 ListTile(
                   title: const Text('45 分钟'),
-                  onTap: () => _setSleepTimer(context, const Duration(minutes: 45)),
+                  onTap: () =>
+                      _setSleepTimer(context, const Duration(minutes: 45)),
                 ),
                 ListTile(
                   title: const Text('60 分钟'),
-                  onTap: () => _setSleepTimer(context, const Duration(minutes: 60)),
+                  onTap: () =>
+                      _setSleepTimer(context, const Duration(minutes: 60)),
                 ),
               ],
             ),
@@ -553,7 +517,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   }
 
   void _setSleepTimer(BuildContext context, Duration duration) {
-    final sleepTimerController = ref.read(sleepTimerControllerProvider.notifier);
+    final sleepTimerController =
+        ref.read(sleepTimerControllerProvider.notifier);
     final audioService = ref.read(audioPlayerServiceProvider);
 
     sleepTimerController.setTimer(duration, () {

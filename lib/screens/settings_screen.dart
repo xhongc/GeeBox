@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/theme_provider.dart';
 import '../theme/app_theme.dart';
+import '../widgets/forui_components.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -11,186 +13,92 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final themeSettings = ref.watch(themeSettingsProvider);
 
-    return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          // 顶部应用栏
-          const SliverAppBar(
-            floating: true,
-            title: Text(
-              '设置',
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
+    return ChansonScaffold(
+      title: '设置',
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 150),
+        children: [
+          ChansonSection(
+            title: '服务器',
+            children: [
+              ChansonTile(
+                icon: FLucideIcons.serverCog,
+                title: '服务器配置',
+                subtitle: '配置 Subsonic 服务器',
+                onPress: () => context.push('/config'),
               ),
-            ),
+            ],
           ),
-
-          // 服务器设置
-          SliverToBoxAdapter(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-                  child: Text(
-                    '服务器',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey,
-                    ),
-                  ),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.dns),
-                  title: const Text('服务器配置'),
-                  subtitle: const Text('配置 Subsonic 服务器'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {},
-                ),
-              ],
-            ),
+          ChansonSection(
+            title: '内容显示',
+            children: [
+              ChansonTile(
+                icon: FLucideIcons.layoutDashboard,
+                title: '媒体类型',
+                subtitle: '选择要显示的内容类型',
+                onPress: () => context.push('/media-type-settings'),
+              ),
+            ],
           ),
-
-          // 内容显示设置
-          SliverToBoxAdapter(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-                  child: Text(
-                    '内容显示',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey,
-                    ),
-                  ),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.dashboard_customize),
-                  title: const Text('媒体类型'),
-                  subtitle: const Text('选择要显示的内容类型'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    context.push('/media-type-settings');
-                  },
-                ),
-              ],
-            ),
-          ),
-
-          // 外观设置
-          SliverToBoxAdapter(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-                  child: Text(
-                    '外观',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey,
-                    ),
-                  ),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.brightness_6),
-                  title: const Text('主题模式'),
-                  subtitle: Text(_getThemeModeText(themeSettings.mode)),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => _showThemeModeDialog(context, ref),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.palette),
-                  title: const Text('主题色'),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 24,
-                        height: 24,
-                        decoration: BoxDecoration(
-                          color: themeSettings.seedColor,
-                          shape: BoxShape.circle,
+          ChansonSection(
+            title: '外观',
+            children: [
+              ChansonTile(
+                icon: FLucideIcons.sunMoon,
+                title: '主题模式',
+                subtitle: _getThemeModeText(themeSettings.mode),
+                onPress: () => _showThemeModeDialog(context, ref),
+              ),
+              ChansonTile(
+                icon: FLucideIcons.palette,
+                title: '主题色',
+                details: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 22,
+                      height: 22,
+                      decoration: BoxDecoration(
+                        color: themeSettings.seedColor,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: context.theme.colors.border,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      const Icon(Icons.chevron_right),
-                    ],
-                  ),
-                  onTap: () => _showThemeColorDialog(context, ref),
-                ),
-              ],
-            ),
-          ),
-
-          // 播放设置
-          SliverToBoxAdapter(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-                  child: Text(
-                    '播放',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey,
                     ),
-                  ),
+                  ],
                 ),
-                ListTile(
-                  leading: const Icon(Icons.high_quality),
-                  title: const Text('音质设置'),
-                  subtitle: const Text('高品质'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {},
-                ),
-                ListTile(
-                  leading: const Icon(Icons.download),
-                  title: const Text('下载设置'),
-                  subtitle: const Text('管理下载和缓存'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {},
-                ),
-              ],
-            ),
+                onPress: () => _showThemeColorDialog(context, ref),
+              ),
+            ],
           ),
-
-          // 关于
-          SliverToBoxAdapter(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-                  child: Text(
-                    '关于',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey,
-                    ),
-                  ),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.info),
-                  title: const Text('关于 Chanson'),
-                  subtitle: const Text('版本 1.0.0'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {},
-                ),
-              ],
-            ),
+          ChansonSection(
+            title: '播放',
+            children: [
+              ChansonTile(
+                icon: FLucideIcons.badgeCheck,
+                title: '音质设置',
+                subtitle: '高品质',
+                onPress: () {},
+              ),
+              ChansonTile(
+                icon: FLucideIcons.download,
+                title: '下载设置',
+                subtitle: '管理下载和缓存',
+                onPress: () {},
+              ),
+            ],
           ),
-
-          const SliverToBoxAdapter(child: SizedBox(height: 150)),
+          const ChansonSection(
+            title: '关于',
+            children: [
+              ChansonTile(
+                icon: FLucideIcons.info,
+                title: '关于 Chanson',
+                subtitle: '版本 1.0.0',
+              ),
+            ],
+          ),
         ],
       ),
     );

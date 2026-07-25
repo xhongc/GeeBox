@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../providers/music_repository_provider.dart';
-import '../providers/audio_player_provider.dart';
+import 'package:forui/forui.dart';
 import '../models/song.dart';
+import '../providers/audio_player_provider.dart';
+import '../providers/music_repository_provider.dart';
 import '../widgets/error_view.dart';
+import '../widgets/forui_components.dart';
 
-// 专辑详情 Provider
-final albumDetailProvider = FutureProvider.family<List<Song>, String>((ref, albumId) async {
+final albumDetailProvider =
+    FutureProvider.family<List<Song>, String>((ref, albumId) async {
   final repository = ref.watch(musicRepositoryProvider);
   return await repository.getAlbum(albumId);
 });
@@ -30,183 +32,85 @@ class AlbumDetailScreen extends ConsumerWidget {
     final songsAsync = ref.watch(albumDetailProvider(albumId));
     final repository = ref.read(musicRepositoryProvider);
 
-    return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          // 顶部应用栏
-          SliverAppBar(
-            expandedHeight: 300,
-            pinned: true,
-            flexibleSpace: FlexibleSpaceBar(
-              title: Text(
-                albumName,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  shadows: [
-                    Shadow(
-                      offset: Offset(0, 1),
-                      blurRadius: 3.0,
-                      color: Color.fromARGB(128, 0, 0, 0),
-                    ),
-                  ],
-                ),
-              ),
-              background: coverArtId != null
-                  ? Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        Image.network(
-                          repository.getCoverArtUrl(coverArtId!, size: 500),
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Container(
-                              color: Colors.grey[300],
-                              child: const Icon(
-                                Icons.album,
-                                size: 100,
-                                color: Colors.grey,
-                              ),
+    return ChansonScaffold(
+      title: albumName,
+      child: songsAsync.when(
+        data: (songs) => ListView(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+          children: [
+            _AlbumHero(
+              title: albumName,
+              artist: albumArtist,
+              coverUrl: coverArtId == null
+                  ? null
+                  : repository.getCoverArtUrl(coverArtId!, size: 500),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: FButton(
+                    onPress: songs.isEmpty
+                        ? null
+                        : () async {
+                            final playerService =
+                                ref.read(audioPlayerServiceProvider);
+                            await playerService.setPlaylist(songs);
+                            await playerService.playAtIndex(
+                              0,
+                              (songId) => repository.getStreamUrl(songId),
                             );
                           },
-                        ),
-                        // 渐变遮罩
-                        Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                Colors.transparent,
-                                Colors.black.withOpacity(0.7),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    )
-                  : Container(
-                      color: Colors.grey[300],
-                      child: const Icon(
-                        Icons.album,
-                        size: 100,
-                        color: Colors.grey,
-                      ),
-                    ),
-            ),
-          ),
-
-          // 专辑信息
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (albumArtist != null)
-                    Text(
-                      albumArtist!,
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                  const SizedBox(height: 16),
-                  songsAsync.when(
-                    data: (songs) => Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: songs.isEmpty
-                                ? null
-                                : () async {
-                                    // 播放全部
-                                    final playerService = ref.read(audioPlayerServiceProvider);
-                                    await playerService.setPlaylist(songs);
-                                    await playerService.playAtIndex(
-                                      0,
-                                      (songId) => repository.getStreamUrl(songId),
-                                    );
-                                  },
-                            icon: const Icon(Icons.play_arrow),
-                            label: const Text('播放全部'),
-                            style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: songs.isEmpty
-                                ? null
-                                : () async {
-                                    // 随机播放
-                                    final shuffledSongs = List<Song>.from(songs)..shuffle();
-                                    final playerService = ref.read(audioPlayerServiceProvider);
-                                    await playerService.setPlaylist(shuffledSongs);
-                                    await playerService.playAtIndex(
-                                      0,
-                                      (songId) => repository.getStreamUrl(songId),
-                                    );
-                                  },
-                            icon: const Icon(Icons.shuffle),
-                            label: const Text('随机播放'),
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    loading: () => const SizedBox.shrink(),
-                    error: (_, __) => const SizedBox.shrink(),
+                    prefix: const Icon(FLucideIcons.play),
+                    child: const Text('播放全部'),
                   ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FButton(
+                    variant: FButtonVariant.outline,
+                    onPress: songs.isEmpty
+                        ? null
+                        : () async {
+                            final shuffledSongs = List<Song>.from(songs)
+                              ..shuffle();
+                            final playerService =
+                                ref.read(audioPlayerServiceProvider);
+                            await playerService.setPlaylist(shuffledSongs);
+                            await playerService.playAtIndex(
+                              0,
+                              (songId) => repository.getStreamUrl(songId),
+                            );
+                          },
+                    prefix: const Icon(FLucideIcons.shuffle),
+                    child: const Text('随机播放'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            if (songs.isEmpty)
+              const SizedBox(
+                height: 220,
+                child: ChansonEmptyState(
+                  icon: FLucideIcons.music,
+                  message: '暂无歌曲',
+                ),
+              )
+            else
+              ChansonSection(
+                title: '歌曲',
+                children: [
+                  for (final (index, song) in songs.indexed)
+                    _buildSongItem(context, ref, song, index, songs),
                 ],
               ),
-            ),
-          ),
-
-          // 歌曲列表
-          songsAsync.when(
-            data: (songs) {
-              if (songs.isEmpty) {
-                return const SliverToBoxAdapter(
-                  child: Padding(
-                    padding: EdgeInsets.all(32),
-                    child: Center(
-                      child: Text(
-                        '暂无歌曲',
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                    ),
-                  ),
-                );
-              }
-              return SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final song = songs[index];
-                    return _buildSongItem(context, ref, song, index + 1, songs);
-                  },
-                  childCount: songs.length,
-                ),
-              );
-            },
-            loading: () => const SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.all(32),
-                child: Center(child: CircularProgressIndicator()),
-              ),
-            ),
-            error: (error, stack) => SliverToBoxAdapter(
-              child: error.toErrorWidget(
-                onRetry: () => ref.invalidate(albumDetailProvider(albumId)),
-              ),
-            ),
-          ),
-
-          const SliverToBoxAdapter(child: SizedBox(height: 100)),
-        ],
+          ],
+        ),
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, stack) => error.toErrorWidget(
+          onRetry: () => ref.invalidate(albumDetailProvider(albumId)),
+        ),
       ),
     );
   }
@@ -215,76 +119,54 @@ class AlbumDetailScreen extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     Song song,
-    int trackNumber,
+    int index,
     List<Song> allSongs,
   ) {
-    // 直接 watch currentSongProvider 来监听当前播放歌曲的变化
-    final currentSongAsync = ref.watch(currentSongProvider);
-    final currentSong = currentSongAsync.value;
+    final currentSong = ref.watch(currentSongProvider).value;
     final isPlaying = currentSong?.id == song.id;
+    final theme = context.theme;
 
-    return ListTile(
-      leading: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: isPlaying ? Theme.of(context).colorScheme.primary : Colors.grey[300],
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: Center(
-          child: isPlaying
-              ? Icon(
-                  Icons.volume_up,
-                  color: Theme.of(context).colorScheme.onPrimary,
-                  size: 20,
-                )
-              : Text(
-                  trackNumber.toString(),
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey[700],
-                  ),
-                ),
-        ),
-      ),
-      title: Text(
-        song.title,
-        style: TextStyle(
-          fontWeight: isPlaying ? FontWeight.bold : FontWeight.normal,
-          color: isPlaying ? Theme.of(context).colorScheme.primary : null,
-        ),
-      ),
-      subtitle: Text(
-        song.artist ?? '未知艺术家',
-        style: TextStyle(
-          color: Colors.grey[600],
-        ),
-      ),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (song.duration != null)
-            Text(
-              _formatDuration(song.duration!),
-              style: TextStyle(
-                color: Colors.grey[600],
-                fontSize: 12,
-              ),
-            ),
-          IconButton(
-            icon: const Icon(Icons.more_vert),
-            onPressed: () {
-              _showSongOptions(context, ref, song);
-            },
+    return FTile(
+      selected: isPlaying,
+      prefix: SizedBox.square(
+        dimension: 38,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: isPlaying ? theme.colors.primary : theme.colors.muted,
+            borderRadius: BorderRadius.circular(6),
           ),
-        ],
+          child: Center(
+            child: isPlaying
+                ? Icon(
+                    FLucideIcons.volume2,
+                    color: theme.colors.primaryForeground,
+                    size: 18,
+                  )
+                : Text(
+                    '${index + 1}',
+                    style: theme.typography.body.sm.copyWith(
+                      color: theme.colors.mutedForeground,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+          ),
+        ),
       ),
-      onTap: () async {
-        // 播放歌曲
+      title: Text(song.title),
+      subtitle: Text(song.artist ?? '未知艺术家'),
+      details:
+          song.duration == null ? null : Text(_formatDuration(song.duration!)),
+      suffix: FButton.icon(
+        variant: FButtonVariant.ghost,
+        size: FButtonSizeVariant.sm,
+        onPress: () => _showSongOptions(context, ref, song),
+        child: const Icon(FLucideIcons.ellipsisVertical),
+      ),
+      onPress: () async {
         final playerService = ref.read(audioPlayerServiceProvider);
-        await playerService.setPlaylist(allSongs, initialIndex: trackNumber - 1);
+        await playerService.setPlaylist(allSongs, initialIndex: index);
         await playerService.playAtIndex(
-          trackNumber - 1,
+          index,
           (songId) => ref.read(musicRepositoryProvider).getStreamUrl(songId),
         );
       },
@@ -304,35 +186,89 @@ class AlbumDetailScreen extends ConsumerWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ListTile(
-              leading: const Icon(Icons.play_arrow),
+            FTile(
+              prefix: const Icon(FLucideIcons.play),
               title: const Text('播放'),
-              onTap: () async {
+              onPress: () async {
                 Navigator.pop(context);
                 final playerService = ref.read(audioPlayerServiceProvider);
                 final repository = ref.read(musicRepositoryProvider);
-                await playerService.playSong(song, repository.getStreamUrl(song.id));
+                await playerService.playSong(
+                  song,
+                  repository.getStreamUrl(song.id),
+                );
               },
             ),
-            ListTile(
-              leading: const Icon(Icons.playlist_add),
+            FTile(
+              prefix: const Icon(FLucideIcons.listPlus),
               title: const Text('添加到播放列表'),
-              onTap: () {
-                Navigator.pop(context);
-                // TODO: 实现添加到播放列表功能
-              },
+              onPress: () => Navigator.pop(context),
             ),
-            ListTile(
-              leading: const Icon(Icons.share),
+            FTile(
+              prefix: const Icon(FLucideIcons.share2),
               title: const Text('分享'),
-              onTap: () {
-                Navigator.pop(context);
-                // TODO: 实现分享功能
-              },
+              onPress: () => Navigator.pop(context),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _AlbumHero extends StatelessWidget {
+  final String title;
+  final String? artist;
+  final String? coverUrl;
+
+  const _AlbumHero({
+    required this.title,
+    required this.artist,
+    required this.coverUrl,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.theme;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        SizedBox.square(
+          dimension: 132,
+          child: ChansonCoverArt(
+            imageUrl: coverUrl,
+            fallbackIcon: FLucideIcons.disc3,
+            borderRadius: 8,
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: theme.typography.body.xl2.copyWith(
+                  color: theme.colors.foreground,
+                  fontWeight: FontWeight.w800,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              if (artist != null) ...[
+                const SizedBox(height: 6),
+                Text(
+                  artist!,
+                  style: theme.typography.body.sm.copyWith(
+                    color: theme.colors.mutedForeground,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/music_repository_provider.dart';
 import '../providers/media_type_settings_provider.dart';
 import '../models/album.dart';
 import '../widgets/error_view.dart';
+import '../widgets/forui_components.dart';
 
 class DiscoverScreen extends ConsumerStatefulWidget {
   const DiscoverScreen({super.key});
@@ -186,7 +188,6 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                 ),
               ),
             ),
-
             albumsAsync.when(
               data: (albums) {
                 if (albums.isEmpty) {
@@ -205,7 +206,8 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
                 return SliverPadding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   sliver: SliverGrid(
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 2,
                       mainAxisSpacing: 16,
                       crossAxisSpacing: 16,
@@ -282,34 +284,23 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
     Color color,
     VoidCallback onTap,
   ) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        leading: Container(
-          width: 48,
-          height: 48,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: FTile(
+        prefix: DecoratedBox(
           decoration: BoxDecoration(
-            color: color.withOpacity(0.2),
+            color: color.withValues(alpha: 0.16),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(icon, color: color, size: 28),
-        ),
-        title: Text(
-          title,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
+          child: SizedBox.square(
+            dimension: 48,
+            child: Icon(icon, color: color, size: 28),
           ),
         ),
-        subtitle: Text(
-          subtitle,
-          style: TextStyle(
-            fontSize: 13,
-            color: Colors.grey[600],
-          ),
-        ),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: onTap,
+        title: Text(title),
+        subtitle: Text(subtitle),
+        suffix: const Icon(FLucideIcons.chevronRight),
+        onPress: onTap,
       ),
     );
   }
@@ -317,8 +308,14 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
   Widget _buildAlbumCard(BuildContext context, Album album) {
     final repository = ref.read(musicRepositoryProvider);
 
-    return InkWell(
-      onTap: () {
+    return ChansonGridCard(
+      imageUrl: album.coverArt == null
+          ? null
+          : repository.getCoverArtUrl(album.coverArt!),
+      title: album.name,
+      subtitle: album.artist ?? '未知艺术家',
+      fallbackIcon: FLucideIcons.disc3,
+      onPress: () {
         context.push('/album-detail', extra: {
           'albumId': album.id,
           'albumName': album.name,
@@ -326,63 +323,6 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
           'coverArtId': album.coverArt,
         });
       },
-      borderRadius: BorderRadius.circular(8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 封面
-          AspectRatio(
-            aspectRatio: 1,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: album.coverArt != null
-                  ? Image.network(
-                      repository.getCoverArtUrl(album.coverArt!),
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          color: Colors.grey[300],
-                          child: const Icon(
-                            Icons.album,
-                            size: 64,
-                            color: Colors.grey,
-                          ),
-                        );
-                      },
-                    )
-                  : Container(
-                      color: Colors.grey[300],
-                      child: const Icon(
-                        Icons.album,
-                        size: 64,
-                        color: Colors.grey,
-                      ),
-                    ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          // 标题
-          Text(
-            album.name,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          // 艺术家
-          Text(
-            album.artist ?? '未知艺术家',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[600],
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
     );
   }
 }
