@@ -5,6 +5,7 @@ import '../providers/playlist_provider.dart';
 import '../providers/music_repository_provider.dart';
 import '../providers/media_type_settings_provider.dart';
 import '../widgets/error_view.dart';
+import 'settings_screen.dart';
 
 // 音乐库统计 Provider
 final libraryStatsProvider = FutureProvider.autoDispose<Map<String, int>>((ref) async {
@@ -115,6 +116,16 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
                     context.push('/playlist-management');
                   },
                 ),
+              IconButton(
+                icon: const Icon(Icons.settings_outlined),
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const SettingsScreen(),
+                    ),
+                  );
+                },
+              ),
             ],
           ),
 
@@ -151,6 +162,16 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen>
                   icon: const Icon(Icons.add),
                   onPressed: () {
                     context.push('/playlist-management');
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.settings_outlined),
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const SettingsScreen(),
+                      ),
+                    );
                   },
                 ),
               ],

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'home_screen.dart';
 import 'discover_screen.dart';
 import 'library_screen.dart';
-import 'settings_screen.dart';
 import 'player_screen.dart';
 import '../widgets/mini_player.dart';
 
@@ -21,7 +20,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     HomeScreen(),
     DiscoverScreen(),
     LibraryScreen(),
-    SettingsScreen(),
   ];
 
   void _openPlayer() {
@@ -75,11 +73,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                       icon: Icon(Icons.library_music_outlined),
                       selectedIcon: Icon(Icons.library_music),
                       label: '我的音乐',
-                    ),
-                    NavigationDestination(
-                      icon: Icon(Icons.settings_outlined),
-                      selectedIcon: Icon(Icons.settings),
-                      label: '设置',
                     ),
                   ],
                 ),

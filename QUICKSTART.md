@@ -100,6 +100,36 @@ flutter test
 flutter clean
 ```
 
+## 各平台打包（构建产物）
+
+```bash
+# Android APK（通用包）
+flutter build apk
+
+# Android App Bundle（上架 Google Play 推荐）
+flutter build appbundle
+
+# iOS（生成 Xcode 归档，需在 Xcode 中导出）
+flutter build ios --release
+
+# macOS
+flutter build macos
+
+# Linux
+flutter build linux
+
+# Windows
+flutter build windows
+
+# Web
+flutter build web
+```
+
+**说明**:
+- iOS 打包需要 macOS + 完整 Xcode，证书与签名在 Xcode 中配置。
+- Android 打包需要已接受 SDK 许可证与正确的签名配置（发布包需配置 keystore）。
+- Web 构建会受到 CORS 影响，仅适用于无跨域限制的环境或配套代理。
+
 ## 支持的平台
 
 - ✅ macOS（已配置）
