@@ -151,9 +151,7 @@ class PlaylistDetailScreen extends ConsumerWidget {
     final streamUrl = subsonicService.getStreamUrl(songs[0].id);
     audioService.playSong(songs[0], streamUrl);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('开始播放 ${songs.length} 首歌曲')),
-    );
+    showChansonToast(context, '开始播放 ${songs.length} 首歌曲');
   }
 
   void _shufflePlay(BuildContext context, WidgetRef ref, List<Song> songs) {
@@ -167,9 +165,7 @@ class PlaylistDetailScreen extends ConsumerWidget {
     final streamUrl = subsonicService.getStreamUrl(shuffledSongs[0].id);
     audioService.playSong(shuffledSongs[0], streamUrl);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('随机播放模式')),
-    );
+    showChansonToast(context, '随机播放模式');
   }
 
   void _playSong(BuildContext context, WidgetRef ref, Song song) {
@@ -236,9 +232,7 @@ class PlaylistDetailScreen extends ConsumerWidget {
                 refreshPlaylist(ref, playlistId);
 
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('已移除: ${song.title}')),
-                  );
+                  showChansonToast(context, '已移除: ${song.title}');
                 }
               },
             ),
@@ -305,10 +299,8 @@ class PlaylistDetailScreen extends ConsumerWidget {
                       refreshPlaylists(ref);
 
                       if (context.mounted) {
+                        showChansonToast(context, '已更新播放列表');
                         Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('已更新播放列表')),
-                        );
                       }
                     },
                     child: const Text('保存'),
@@ -355,11 +347,9 @@ class PlaylistDetailScreen extends ConsumerWidget {
                       refreshPlaylists(ref);
 
                       if (context.mounted) {
+                        showChansonToast(context, '已删除: ${playlist.name}');
                         Navigator.pop(context);
                         Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('已删除: ${playlist.name}')),
-                        );
                       }
                     },
                     child: const Text('删除'),

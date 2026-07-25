@@ -83,18 +83,14 @@ class PlayQueueScreen extends ConsumerWidget {
       ),
       confirmDismiss: (direction) async {
         if (isCurrentSong) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('无法删除正在播放的歌曲')),
-          );
+          showChansonToast(context, '无法删除正在播放的歌曲', destructive: true);
           return false;
         }
         return true;
       },
       onDismissed: (direction) {
         audioService.removeFromQueue(index);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('已从队列中移除 ${song.title}')),
-        );
+        showChansonToast(context, '已从队列中移除 ${song.title}');
       },
       child: FTile(
         selected: isCurrentSong,
@@ -182,11 +178,9 @@ class PlayQueueScreen extends ConsumerWidget {
                     onPress: () {
                       final audioService = ref.read(audioPlayerServiceProvider);
                       audioService.clearQueue();
+                      showChansonToast(context, '已清空播放队列');
                       Navigator.pop(context);
                       Navigator.pop(context); // 关闭队列页面
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('已清空播放队列')),
-                      );
                     },
                     child: const Text('确定'),
                   ),

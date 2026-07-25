@@ -30,6 +30,7 @@ This repository contains Chanson, a Flutter-based Subsonic music client targetin
 - Use Dart conventions: files in `lower_snake_case`, types in `UpperCamelCase`.
 - Do not edit generated files (`*.g.dart`). When adding models, include Hive annotations, a `cacheTime` field, and register adapters in `lib/main.dart`.
 - Access services via Riverpod providers in `lib/providers/` instead of calling services directly from widgets.
+- Use Forui as the UI framework for app interface components.
 
 ## Testing Guidelines
 

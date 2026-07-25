@@ -163,9 +163,7 @@ class PlaylistManagementScreen extends ConsumerWidget {
           onSubmit: () async {
             final name = nameController.text.trim();
             if (name.isEmpty) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('请输入播放列表名称')),
-              );
+              showChansonToast(context, '请输入播放列表名称', destructive: true);
               return;
             }
 
@@ -180,10 +178,8 @@ class PlaylistManagementScreen extends ConsumerWidget {
             refreshPlaylists(ref);
 
             if (context.mounted) {
+              showChansonToast(context, '已创建播放列表: $name');
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('已创建播放列表: $name')),
-              );
             }
           },
         ),
@@ -245,9 +241,7 @@ class PlaylistManagementScreen extends ConsumerWidget {
           onSubmit: () async {
             final name = nameController.text.trim();
             if (name.isEmpty) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('请输入播放列表名称')),
-              );
+              showChansonToast(context, '请输入播放列表名称', destructive: true);
               return;
             }
 
@@ -263,10 +257,8 @@ class PlaylistManagementScreen extends ConsumerWidget {
             refreshPlaylists(ref);
 
             if (context.mounted) {
+              showChansonToast(context, '已更新播放列表');
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('已更新播放列表')),
-              );
             }
           },
         ),
@@ -308,10 +300,8 @@ class PlaylistManagementScreen extends ConsumerWidget {
                       refreshPlaylists(ref);
 
                       if (context.mounted) {
+                        showChansonToast(context, '已删除播放列表: ${playlist.name}');
                         Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('已删除播放列表: ${playlist.name}')),
-                        );
                       }
                     },
                     child: const Text('删除'),

@@ -191,20 +191,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                                 onPress: () async {
                                   final service =
                                       ref.read(favoriteServiceProvider);
-                                  final messenger =
-                                      ScaffoldMessenger.of(context);
                                   if (starred) {
                                     await service.unstarSong(currentSong.id);
-                                    messenger.showSnackBar(
-                                      const SnackBar(content: Text('已取消收藏')),
-                                    );
+                                    if (!context.mounted) return;
+                                    showChansonToast(context, '已取消收藏');
                                   } else {
                                     await service.starSong(currentSong.id);
-                                    messenger.showSnackBar(
-                                      const SnackBar(
-                                        content: Text('已添加到我喜欢的音乐'),
-                                      ),
-                                    );
+                                    if (!context.mounted) return;
+                                    showChansonToast(context, '已添加到我喜欢的音乐');
                                   }
                                   ref.invalidate(starredSongsProvider);
                                 },
@@ -490,10 +484,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                       variant: FButtonVariant.destructive,
                       onPress: () {
                         sleepTimerController.cancel();
+                        showChansonToast(context, '已取消睡眠定时器');
                         Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('已取消睡眠定时器')),
-                        );
                       },
                       child: const Text('取消定时器'),
                     ),
@@ -545,8 +537,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     Navigator.pop(context);
 
     final minutes = duration.inMinutes;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('已设置 $minutes 分钟后停止播放')),
-    );
+    showChansonToast(context, '已设置 $minutes 分钟后停止播放');
   }
 }

@@ -76,14 +76,12 @@ class FavoritesScreen extends ConsumerWidget {
               prefix: const Icon(FLucideIcons.heartOff),
               title: const Text('取消收藏'),
               onPress: () async {
-                final messenger = ScaffoldMessenger.of(context);
-                Navigator.pop(context);
                 final service = ref.read(favoriteServiceProvider);
                 await service.unstarSong(song.id);
                 ref.invalidate(starredSongsProvider);
-                messenger.showSnackBar(
-                  const SnackBar(content: Text('已取消收藏')),
-                );
+                if (!context.mounted) return;
+                showChansonToast(context, '已取消收藏');
+                Navigator.pop(context);
               },
             ),
           ),

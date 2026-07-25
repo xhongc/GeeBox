@@ -101,12 +101,9 @@ class AddToPlaylistSheet extends ConsumerWidget {
                                   refreshPlaylist(ref, playlist.id);
 
                                   if (context.mounted) {
+                                    showChansonToast(
+                                        context, '已添加到: ${playlist.name}');
                                     Navigator.pop(context);
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text('已添加到: ${playlist.name}'),
-                                      ),
-                                    );
                                   }
                                 },
                         );
@@ -180,9 +177,8 @@ class AddToPlaylistSheet extends ConsumerWidget {
                     onPress: () async {
                       final name = nameController.text.trim();
                       if (name.isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('请输入播放列表名称')),
-                        );
+                        showChansonToast(context, '请输入播放列表名称',
+                            destructive: true);
                         return;
                       }
 
@@ -196,9 +192,8 @@ class AddToPlaylistSheet extends ConsumerWidget {
 
                       if (playlist == null) {
                         if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('创建播放列表失败')),
-                          );
+                          showChansonToast(context, '创建播放列表失败',
+                              destructive: true);
                         }
                         return;
                       }
@@ -208,10 +203,8 @@ class AddToPlaylistSheet extends ConsumerWidget {
                       refreshPlaylists(ref);
 
                       if (context.mounted) {
+                        showChansonToast(context, '已创建播放列表并添加歌曲: $name');
                         Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('已创建播放列表并添加歌曲: $name')),
-                        );
                       }
                     },
                     child: const Text('创建'),

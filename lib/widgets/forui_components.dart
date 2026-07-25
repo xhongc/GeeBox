@@ -1,6 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:forui/forui.dart';
 
+void showChansonToast(
+  BuildContext context,
+  String message, {
+  bool destructive = false,
+}) {
+  showFToast(
+    context: context,
+    variant: destructive ? FToastVariant.destructive : FToastVariant.primary,
+    title: Text(message),
+  );
+}
+
 class ChansonScaffold extends StatelessWidget {
   final String title;
   final Widget child;

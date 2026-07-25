@@ -86,9 +86,7 @@ class _ServerConfigScreenState extends ConsumerState<ServerConfigScreen> {
           );
 
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('连接成功！')),
-            );
+            showChansonToast(context, '连接成功！');
             context.go('/');
           }
         } else {

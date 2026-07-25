@@ -52,9 +52,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('搜索失败: $e')),
-        );
+        showChansonToast(context, '搜索失败: $e', destructive: true);
       }
     } finally {
       if (mounted) {
