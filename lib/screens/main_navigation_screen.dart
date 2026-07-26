@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:forui/forui.dart';
+import '../providers/audio_player_provider.dart';
 import '../providers/navigation_provider.dart';
 import 'home_screen.dart';
 import 'albums_screen.dart';
@@ -39,6 +40,7 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
   @override
   Widget build(BuildContext context) {
     final currentIndex = ref.watch(mainNavigationIndexProvider);
+    final hasTrack = ref.watch(currentSongProvider).valueOrNull != null;
 
     return FScaffold(
       childPad: false,
@@ -47,7 +49,7 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
           children: [
             Positioned.fill(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 12, 12, 184),
+                padding: EdgeInsets.fromLTRB(12, 12, 12, hasTrack ? 184 : 104),
                 child: IndexedStack(
                   index: currentIndex,
                   children: _screens,
@@ -60,6 +62,7 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
               bottom: 0,
               child: _ListenerDock(
                 index: currentIndex,
+                showPlayer: hasTrack,
                 onChange: (index) {
                   ref.read(mainNavigationIndexProvider.notifier).state = index;
                 },
@@ -75,11 +78,13 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
 
 class _ListenerDock extends StatelessWidget {
   final int index;
+  final bool showPlayer;
   final ValueChanged<int> onChange;
   final VoidCallback onPlayerTap;
 
   const _ListenerDock({
     required this.index,
+    required this.showPlayer,
     required this.onChange,
     required this.onPlayerTap,
   });
@@ -106,8 +111,10 @@ class _ListenerDock extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            MiniPlayer(onTap: onPlayerTap),
-            const SizedBox(height: 12),
+            if (showPlayer) ...[
+              MiniPlayer(onTap: onPlayerTap),
+              const SizedBox(height: 12),
+            ],
             Container(
               padding: const EdgeInsets.all(7),
               decoration: BoxDecoration(

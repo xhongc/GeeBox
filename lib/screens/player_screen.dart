@@ -9,6 +9,7 @@ import '../providers/favorite_provider.dart';
 import '../providers/music_repository_provider.dart';
 import '../providers/navigation_provider.dart';
 import '../providers/play_history_provider.dart';
+import '../providers/sleep_timer_provider.dart';
 import '../providers/subsonic_provider.dart';
 import '../services/audio_player_service.dart';
 import '../widgets/forui_components.dart';
@@ -43,6 +44,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     final repository = ref.watch(musicRepositoryProvider);
     final currentSong = ref.watch(currentSongProvider).value;
     final playMode = ref.watch(playModeProvider).value ?? PlayMode.sequence;
+    final playbackError = ref.watch(playbackErrorProvider).valueOrNull;
+    final sleepTimer = ref.watch(sleepTimerControllerProvider);
 
     if (currentSong == null) {
       return FScaffold(
@@ -120,6 +123,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                         song: currentSong,
                         onBack: () => Navigator.pop(context),
                         onFavorite: () => _toggleFavorite(context, currentSong),
+                        onMore: () => _showPlayerOptionsSheet(
+                          context,
+                          ref,
+                          sleepTimer.remaining,
+                        ),
                       ),
                       const SizedBox(height: 20),
                       _DisplaySwitch(
@@ -142,6 +150,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                         ),
                       const SizedBox(height: 26),
                       _SongMeta(song: currentSong),
+                      const SizedBox(height: 12),
+                      _PlaybackDetails(
+                        song: currentSong,
+                        totalDuration: totalDuration,
+                      ),
                       const SizedBox(height: 22),
                       _ProgressBlock(
                         progress: progress.clamp(0.0, 1.0),
@@ -157,17 +170,30 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                           );
                         },
                       ),
+                      if (playbackError != null) ...[
+                        const SizedBox(height: 12),
+                        _PlaybackErrorBanner(
+                          message: playbackError,
+                          onRetry: () => audioService.playAtIndex(
+                            audioService.currentIndex,
+                            (id) => subsonicService.getStreamUrl(id),
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 22),
                       _PlaybackControls(
                         isPlaying: isPlaying,
                         playMode: playMode,
-                        onRepeat: () {
-                          audioService.setPlayMode(
-                            playMode == PlayMode.repeatOne
-                                ? PlayMode.sequence
-                                : PlayMode.repeatOne,
-                          );
-                        },
+                        onShuffle: () => audioService.setPlayMode(
+                          playMode == PlayMode.shuffle
+                              ? PlayMode.sequence
+                              : PlayMode.shuffle,
+                        ),
+                        onRepeat: () => audioService.setPlayMode(
+                          playMode == PlayMode.repeatOne
+                              ? PlayMode.sequence
+                              : PlayMode.repeatOne,
+                        ),
                         onPrevious: () => audioService.previous(
                           (id) => subsonicService.getStreamUrl(id),
                         ),
@@ -217,15 +243,283 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   }
 }
 
+void _showPlayerOptionsSheet(
+  BuildContext context,
+  WidgetRef ref,
+  Duration? sleepRemaining,
+) {
+  showFSheet<void>(
+    context: context,
+    side: FLayout.btt,
+    useSafeArea: true,
+    mainAxisMaxRatio: 0.42,
+    builder: (sheetContext) => DecoratedBox(
+      decoration: const BoxDecoration(gradient: ListenerGradients.shell),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 10, 18, 22),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 42,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFCBD5E1),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              const Text(
+                '更多',
+                style: TextStyle(
+                  color: ListenerColors.foreground,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 14),
+              _PlayerOptionTile(
+                icon: FLucideIcons.timer,
+                title: '睡眠定时器',
+                subtitle: sleepRemaining == null
+                    ? '设置自动暂停播放'
+                    : '${sleepRemaining.inMinutes.clamp(1, 999)} 分钟后暂停',
+                onPress: () async {
+                  Navigator.pop(sheetContext);
+                  await Future<void>.delayed(const Duration(milliseconds: 120));
+                  if (context.mounted) {
+                    _showSleepTimerSheet(context, ref);
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _PlayerOptionTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onPress;
+
+  const _PlayerOptionTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onPress,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return FTappable(
+      onPress: onPress,
+      builder: (context, states, child) {
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(
+              alpha: states.contains(FTappableVariant.pressed) ? 0.88 : 0.74,
+            ),
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: ListenerShadows.soft,
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: ListenerColors.foreground.withValues(alpha: 0.08),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: ListenerColors.foreground, size: 18),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: ListenerColors.foreground,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: ListenerColors.softText,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                FLucideIcons.chevronRight,
+                color: ListenerColors.muted,
+                size: 18,
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+void _showSleepTimerSheet(BuildContext context, WidgetRef ref) {
+  final controller = ref.read(sleepTimerControllerProvider.notifier);
+  final audioService = ref.read(audioPlayerServiceProvider);
+  showFSheet<void>(
+    context: context,
+    side: FLayout.btt,
+    useSafeArea: true,
+    mainAxisMaxRatio: 0.52,
+    builder: (context) => DecoratedBox(
+      decoration: const BoxDecoration(gradient: ListenerGradients.shell),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 10, 18, 22),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 42,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFCBD5E1),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+              const SizedBox(height: 18),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '睡眠定时器',
+                  style: TextStyle(
+                    color: ListenerColors.foreground,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  for (final minutes in [15, 30, 45, 60])
+                    FButton(
+                      variant: FButtonVariant.secondary,
+                      onPress: () {
+                        controller.setTimer(
+                          Duration(minutes: minutes),
+                          audioService.pause,
+                        );
+                        Navigator.pop(context);
+                        showChansonToast(context, '$minutes 分钟后暂停播放');
+                      },
+                      child: Text('$minutes 分钟'),
+                    ),
+                  FButton(
+                    variant: FButtonVariant.outline,
+                    onPress: () {
+                      controller.cancel();
+                      Navigator.pop(context);
+                      showChansonToast(context, '已取消睡眠定时器');
+                    },
+                    child: const Text('取消定时'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _PlaybackErrorBanner extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+
+  const _PlaybackErrorBanner({
+    required this.message,
+    required this.onRetry,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFBEB),
+        borderRadius: BorderRadius.circular(18),
+        border:
+            Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.24)),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            FLucideIcons.triangleAlert,
+            color: Color(0xFFD97706),
+            size: 18,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(
+                color: ListenerColors.foreground,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          FButton(
+            size: FButtonSizeVariant.sm,
+            variant: FButtonVariant.ghost,
+            onPress: onRetry,
+            child: const Text('重试'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _PlayingTopBar extends StatelessWidget {
   final Song song;
   final VoidCallback onBack;
   final VoidCallback onFavorite;
+  final VoidCallback onMore;
 
   const _PlayingTopBar({
     required this.song,
     required this.onBack,
     required this.onFavorite,
+    required this.onMore,
   });
 
   @override
@@ -260,6 +554,12 @@ class _PlayingTopBar extends StatelessWidget {
           ),
         ),
         ListenerCircleButton(icon: FLucideIcons.heart, onPress: onFavorite),
+        const SizedBox(width: 8),
+        ListenerCircleButton(
+          icon: FLucideIcons.ellipsis,
+          tooltip: '更多',
+          onPress: onMore,
+        ),
       ],
     );
   }
@@ -350,8 +650,8 @@ class _CoverStage extends StatelessWidget {
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
     final height = MediaQuery.sizeOf(context).height;
-    final coverSize = (width * 0.74).clamp(236.0, height * 0.34);
-    final resolvedCoverSize = coverSize.clamp(236.0, 288.0);
+    final maxCoverSize = (height * 0.34).clamp(180.0, 288.0);
+    final resolvedCoverSize = (width * 0.74).clamp(180.0, maxCoverSize);
     final discSize = resolvedCoverSize * 0.72;
 
     return SizedBox(
@@ -474,6 +774,61 @@ class _SongMeta extends StatelessWidget {
   }
 }
 
+class _PlaybackDetails extends StatelessWidget {
+  final Song song;
+  final Duration totalDuration;
+
+  const _PlaybackDetails({
+    required this.song,
+    required this.totalDuration,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final details = [
+      if (song.album?.isNotEmpty == true) song.album!,
+      if (song.year != null) '${song.year}',
+      if (song.genre?.isNotEmpty == true) song.genre!,
+      if (song.bitRate != null) '${song.bitRate} kbps',
+      if (song.contentType != null) _formatContentType(song.contentType!),
+      _formatDuration(totalDuration),
+    ];
+
+    return Column(
+      children: [
+        Wrap(
+          alignment: WrapAlignment.center,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final detail in details)
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.74),
+                  borderRadius: BorderRadius.circular(999),
+                  boxShadow: ListenerShadows.soft,
+                ),
+                child: Text(
+                  detail,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: ListenerColors.softText,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
 class _ProgressBlock extends StatelessWidget {
   final double progress;
   final Duration currentPosition;
@@ -525,6 +880,7 @@ class _ProgressBlock extends StatelessWidget {
 class _PlaybackControls extends StatelessWidget {
   final bool isPlaying;
   final PlayMode playMode;
+  final VoidCallback onShuffle;
   final VoidCallback onRepeat;
   final VoidCallback onPrevious;
   final VoidCallback onPlayPause;
@@ -534,6 +890,7 @@ class _PlaybackControls extends StatelessWidget {
   const _PlaybackControls({
     required this.isPlaying,
     required this.playMode,
+    required this.onShuffle,
     required this.onRepeat,
     required this.onPrevious,
     required this.onPlayPause,
@@ -546,6 +903,11 @@ class _PlaybackControls extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
+        _RoundControl(
+          icon: FLucideIcons.shuffle,
+          active: playMode == PlayMode.shuffle,
+          onPress: onShuffle,
+        ),
         _RoundControl(
           icon: playMode == PlayMode.repeatOne
               ? FLucideIcons.repeat1
@@ -594,4 +956,14 @@ String _formatDuration(Duration duration) {
   final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
   final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
   return '$minutes:$seconds';
+}
+
+String _formatContentType(String contentType) {
+  final value = contentType.toLowerCase();
+  if (value.contains('flac')) return 'FLAC';
+  if (value.contains('aac')) return 'AAC';
+  if (value.contains('ogg')) return 'OGG';
+  if (value.contains('wav')) return 'WAV';
+  if (value.contains('mpeg') || value.contains('mp3')) return 'MP3';
+  return contentType.toUpperCase();
 }

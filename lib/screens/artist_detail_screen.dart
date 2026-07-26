@@ -33,6 +33,8 @@ class ArtistDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final artistAsync = ref.watch(artistDetailProvider(artistId));
     final songsAsync = ref.watch(artistSongsProvider(artistId));
+    final isStarred =
+        ref.watch(isArtistStarredProvider(artistId)).valueOrNull ?? false;
     final repository = ref.read(musicRepositoryProvider);
     final coverUrl = coverArtId == null
         ? null
@@ -82,19 +84,14 @@ class ArtistDetailScreen extends ConsumerWidget {
                             delegate: SliverChildListDelegate([
                               _ArtistTopBar(
                                 albumCount: albums.length,
+                                isStarred: isStarred,
                                 onBack: () => Navigator.of(context).pop(),
-                                onFavorite: () async {
-                                  final ok = await ref
-                                      .read(favoriteServiceProvider)
-                                      .starArtist(artistId);
-                                  if (!context.mounted) return;
-                                  if (!ok) {
-                                    showChansonToast(context, '收藏艺术家失败',
-                                        destructive: true);
-                                    return;
-                                  }
-                                  showChansonToast(context, '已收藏艺术家');
-                                },
+                                onFavorite: () => _toggleArtistFavorite(
+                                  context,
+                                  ref,
+                                  artistId,
+                                  isStarred,
+                                ),
                               ),
                               const SizedBox(height: 22),
                               _ArtistDetailHero(
@@ -218,11 +215,13 @@ class ArtistDetailScreen extends ConsumerWidget {
 
 class _ArtistTopBar extends StatelessWidget {
   final int albumCount;
+  final bool isStarred;
   final VoidCallback onBack;
   final VoidCallback onFavorite;
 
   const _ArtistTopBar({
     required this.albumCount,
+    required this.isStarred,
     required this.onBack,
     required this.onFavorite,
   });
@@ -258,10 +257,39 @@ class _ArtistTopBar extends StatelessWidget {
             ],
           ),
         ),
-        ListenerCircleButton(icon: FLucideIcons.heart, onPress: onFavorite),
+        ListenerCircleButton(
+          icon: FLucideIcons.heart,
+          iconColor:
+              isStarred ? const Color(0xFFEF4444) : ListenerColors.foreground,
+          onPress: onFavorite,
+        ),
       ],
     );
   }
+}
+
+Future<void> _toggleArtistFavorite(
+  BuildContext context,
+  WidgetRef ref,
+  String artistId,
+  bool isStarred,
+) async {
+  final service = ref.read(favoriteServiceProvider);
+  final ok = isStarred
+      ? await service.unstarArtist(artistId)
+      : await service.starArtist(artistId);
+  if (!context.mounted) return;
+  if (!ok) {
+    showChansonToast(
+      context,
+      isStarred ? '取消收藏艺术家失败' : '收藏艺术家失败',
+      destructive: true,
+    );
+    return;
+  }
+  ref.invalidate(starredItemsProvider);
+  ref.invalidate(isArtistStarredProvider(artistId));
+  showChansonToast(context, isStarred ? '已取消收藏艺术家' : '已收藏艺术家');
 }
 
 class _ArtistDetailHero extends StatelessWidget {

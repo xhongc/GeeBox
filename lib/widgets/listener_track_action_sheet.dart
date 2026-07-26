@@ -8,6 +8,7 @@ import '../models/song.dart';
 import '../providers/audio_player_provider.dart';
 import '../providers/favorite_provider.dart';
 import '../providers/playlist_provider.dart';
+import '../providers/search_provider.dart';
 import 'forui_components.dart';
 import 'listener_components.dart';
 
@@ -202,22 +203,14 @@ class _ListenerTrackActionSheetState
             icon: FLucideIcons.disc3,
             title: '查看专辑',
             subtitle: song.album!,
-            onPress: () {
-              Navigator.of(context).pop();
-              context.push('/search');
-              showChansonToast(context, '可在搜索中查找专辑：${song.album}');
-            },
+            onPress: () => _openAlbum(context, song),
           ),
         if (song.artist != null)
           _SheetAction(
             icon: FLucideIcons.userRound,
             title: '查看艺术家',
             subtitle: song.artist!,
-            onPress: () {
-              Navigator.of(context).pop();
-              context.push('/search');
-              showChansonToast(context, '可在搜索中查找艺术家：${song.artist}');
-            },
+            onPress: () => _openArtist(context, song),
           ),
       ],
     );
@@ -316,7 +309,73 @@ class _ListenerTrackActionSheetState
     Navigator.of(context).pop();
     showChansonToast(context, ok ? '已添加到 ${playlist.name}' : '添加失败');
   }
+
+  Future<void> _openAlbum(BuildContext context, Song song) async {
+    final albumName = song.album;
+    if (albumName == null || albumName.trim().isEmpty) return;
+
+    final result =
+        await widget.ref.read(searchServiceProvider).search(albumName);
+    if (!context.mounted) return;
+    Navigator.of(context).pop();
+
+    final normalizedAlbum = _normalize(albumName);
+    final normalizedArtist = _normalize(song.artist);
+    final matches = result.albums.where((album) {
+      final albumMatches = _normalize(album.name) == normalizedAlbum;
+      if (!albumMatches) return false;
+      if (normalizedArtist.isEmpty) return true;
+      return _normalize(album.artist) == normalizedArtist;
+    }).toList();
+    final album = matches.isNotEmpty
+        ? matches.first
+        : result.albums
+            .where((album) => _normalize(album.name) == normalizedAlbum)
+            .firstOrNull;
+
+    if (album == null) {
+      context.push('/search?q=${Uri.encodeQueryComponent(albumName)}');
+      showChansonToast(context, '未直接匹配专辑，已打开搜索结果');
+      return;
+    }
+
+    context.push('/album-detail', extra: {
+      'albumId': album.id,
+      'albumName': album.name,
+      'albumArtist': album.artist,
+      'coverArtId': album.coverArt,
+    });
+  }
+
+  Future<void> _openArtist(BuildContext context, Song song) async {
+    final artistName = song.artist;
+    if (artistName == null || artistName.trim().isEmpty) return;
+
+    final result =
+        await widget.ref.read(searchServiceProvider).search(artistName);
+    if (!context.mounted) return;
+    Navigator.of(context).pop();
+
+    final normalizedArtist = _normalize(artistName);
+    final artist = result.artists
+        .where((artist) => _normalize(artist.name) == normalizedArtist)
+        .firstOrNull;
+
+    if (artist == null) {
+      context.push('/search?q=${Uri.encodeQueryComponent(artistName)}');
+      showChansonToast(context, '未直接匹配艺术家，已打开搜索结果');
+      return;
+    }
+
+    context.push('/artist-detail', extra: {
+      'artistId': artist.id,
+      'artistName': artist.name,
+      'coverArtId': artist.coverArt,
+    });
+  }
 }
+
+String _normalize(String? value) => (value ?? '').trim().toLowerCase();
 
 class _SheetAction extends StatelessWidget {
   final IconData icon;

@@ -5,7 +5,6 @@ import 'package:forui/forui.dart';
 import '../models/song.dart';
 import '../providers/audio_player_provider.dart';
 import '../providers/music_repository_provider.dart';
-import '../widgets/forui_components.dart';
 import '../widgets/listener_components.dart';
 import '../widgets/listener_track_action_sheet.dart';
 
@@ -18,6 +17,14 @@ class SongsScreen extends ConsumerStatefulWidget {
 
 class _SongsScreenState extends ConsumerState<SongsScreen> {
   String _sort = 'recently-added';
+  final TextEditingController _filterController = TextEditingController();
+  String _filter = '';
+
+  @override
+  void dispose() {
+    _filterController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -38,14 +45,30 @@ class _SongsScreenState extends ConsumerState<SongsScreen> {
                   onRefresh: () => ref.invalidate(songsLibraryProvider(_sort)),
                 ),
                 const SizedBox(height: 18),
+                _LibraryFilterField(
+                  controller: _filterController,
+                  hint: '过滤歌曲、艺术家或专辑',
+                  onChanged: (value) => setState(() => _filter = value),
+                  onClear: () {
+                    _filterController.clear();
+                    setState(() => _filter = '');
+                  },
+                ),
+                const SizedBox(height: 18),
                 songsAsync.when(
-                  data: (songs) => _SongsSummary(
-                    sort: _sort,
-                    count: songs.length,
-                    onPlay: songs.isEmpty ? null : () => _playSongs(ref, songs),
-                    onShuffle:
-                        songs.isEmpty ? null : () => _shuffleSongs(ref, songs),
-                  ),
+                  data: (songs) {
+                    final filtered = _filterSongs(songs, _filter);
+                    return _SongsSummary(
+                      sort: _sort,
+                      count: filtered.length,
+                      onPlay: filtered.isEmpty
+                          ? null
+                          : () => _playSongs(ref, filtered),
+                      onShuffle: filtered.isEmpty
+                          ? null
+                          : () => _shuffleSongs(ref, filtered),
+                    );
+                  },
                   loading: () => _SongsSummary(
                     sort: _sort,
                     count: 0,
@@ -66,7 +89,8 @@ class _SongsScreenState extends ConsumerState<SongsScreen> {
           ),
           songsAsync.when(
             data: (songs) {
-              if (songs.isEmpty) {
+              final filtered = _filterSongs(songs, _filter);
+              if (filtered.isEmpty) {
                 return const SliverFillRemaining(
                   hasScrollBody: false,
                   child: _SongsEmpty(),
@@ -78,29 +102,27 @@ class _SongsScreenState extends ConsumerState<SongsScreen> {
                 sliver: SliverList(
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
-                      final song = songs[index];
+                      final song = filtered[index];
                       final imageUrl = _songCoverUrl(ref, song);
                       return ListenerTrackRow(
                         song: song,
                         imageUrl: imageUrl,
                         onPress: () => _playSongs(
                           ref,
-                          songs,
+                          filtered,
                           initialIndex: index,
                         ),
-                        onFavorite: () =>
-                            showChansonToast(context, '收藏功能将在喜爱页统一管理'),
                         onMore: () => showListenerTrackActionSheet(
                           context: context,
                           ref: ref,
                           song: song,
                           imageUrl: imageUrl,
-                          queue: songs,
+                          queue: filtered,
                           index: index,
                         ),
                       );
                     },
-                    childCount: songs.length,
+                    childCount: filtered.length,
                   ),
                 ),
               );
@@ -121,6 +143,62 @@ class _SongsScreenState extends ConsumerState<SongsScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _LibraryFilterField extends StatelessWidget {
+  final TextEditingController controller;
+  final String hint;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClear;
+
+  const _LibraryFilterField({
+    required this.controller,
+    required this.hint,
+    required this.onChanged,
+    required this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.84),
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: ListenerShadows.soft,
+      ),
+      child: FTextField(
+        hint: hint,
+        style: FTextFieldStyleDelta.delta(
+          color: FVariantsValueDelta.delta([
+            FVariantValueDeltaOperation.all(Colors.transparent),
+          ]),
+          border: FVariantsValueDelta.delta([
+            FVariantValueDeltaOperation.all(InputBorder.none),
+          ]),
+        ),
+        control: FTextFieldControl.managed(
+          controller: controller,
+          onChange: (value) => onChanged(value.text),
+        ),
+        prefixBuilder: (context, style, variants) =>
+            FTextField.prefixIconBuilder(
+          context,
+          style,
+          variants,
+          const Icon(FLucideIcons.search),
+        ),
+        suffixBuilder: controller.text.isEmpty
+            ? null
+            : (context, style, variants) => FButton.icon(
+                  variant: FButtonVariant.ghost,
+                  size: FButtonSizeVariant.sm,
+                  onPress: onClear,
+                  child: const Icon(FLucideIcons.x),
+                ),
       ),
     );
   }
@@ -389,6 +467,17 @@ String _heroTitle(String sort) {
     'a-z' => '按字母慢慢翻',
     _ => '刚收进来的新歌',
   };
+}
+
+List<Song> _filterSongs(List<Song> songs, String query) {
+  final normalized = query.trim().toLowerCase();
+  if (normalized.isEmpty) return songs;
+  return songs.where((song) {
+    return song.title.toLowerCase().contains(normalized) ||
+        (song.artist ?? '').toLowerCase().contains(normalized) ||
+        (song.album ?? '').toLowerCase().contains(normalized) ||
+        (song.genre ?? '').toLowerCase().contains(normalized);
+  }).toList();
 }
 
 String _summarySubtitle(String sort) {

@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:forui/forui.dart';
+import 'package:go_router/go_router.dart';
 
 import '../models/song.dart';
 import '../providers/audio_player_provider.dart';
+import '../providers/favorite_provider.dart';
 import '../providers/music_repository_provider.dart';
+import '../providers/search_provider.dart';
 import '../widgets/forui_components.dart';
 import '../widgets/listener_components.dart';
 import '../widgets/listener_track_action_sheet.dart';
@@ -33,6 +36,8 @@ class AlbumDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final songsAsync = ref.watch(albumDetailProvider(albumId));
     final repository = ref.read(musicRepositoryProvider);
+    final isStarred =
+        ref.watch(isAlbumStarredProvider(albumId)).valueOrNull ?? false;
     final coverUrl = coverArtId == null
         ? null
         : repository.getCoverArtUrl(coverArtId!, size: 600);
@@ -59,10 +64,20 @@ class AlbumDetailScreen extends ConsumerWidget {
                           delegate: SliverChildListDelegate([
                             _AlbumTopBar(
                               artist: albumArtist,
+                              isStarred: isStarred,
                               onBack: () => Navigator.of(context).pop(),
-                              onFavorite: () => showChansonToast(
+                              onArtist: albumArtist == null
+                                  ? null
+                                  : () => _openArtist(
+                                        context,
+                                        ref,
+                                        albumArtist!,
+                                      ),
+                              onFavorite: () => _toggleAlbumFavorite(
                                 context,
-                                '专辑收藏即将接入',
+                                ref,
+                                albumId,
+                                isStarred,
                               ),
                             ),
                             const SizedBox(height: 22),
@@ -71,6 +86,13 @@ class AlbumDetailScreen extends ConsumerWidget {
                               artist: albumArtist,
                               coverUrl: coverUrl,
                               trackCount: songs.length,
+                              onArtist: albumArtist == null
+                                  ? null
+                                  : () => _openArtist(
+                                        context,
+                                        ref,
+                                        albumArtist!,
+                                      ),
                               duration: songs.fold<int>(
                                 0,
                                 (total, song) => total + (song.duration ?? 0),
@@ -125,10 +147,6 @@ class AlbumDetailScreen extends ConsumerWidget {
                                         songs,
                                         initialIndex: index,
                                       ),
-                                      onFavorite: () => showChansonToast(
-                                        context,
-                                        '收藏功能将在喜爱页统一管理',
-                                      ),
                                       onMore: () =>
                                           showListenerTrackActionSheet(
                                         context: context,
@@ -168,12 +186,16 @@ class AlbumDetailScreen extends ConsumerWidget {
 
 class _AlbumTopBar extends StatelessWidget {
   final String? artist;
+  final bool isStarred;
   final VoidCallback onBack;
+  final VoidCallback? onArtist;
   final VoidCallback onFavorite;
 
   const _AlbumTopBar({
     required this.artist,
+    required this.isStarred,
     required this.onBack,
+    required this.onArtist,
     required this.onFavorite,
   });
 
@@ -199,13 +221,16 @@ class _AlbumTopBar extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 3),
-              Text(
-                artist ?? '未知艺术家',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: ListenerColors.muted,
-                  fontSize: 12,
+              FTappable(
+                onPress: onArtist,
+                child: Text(
+                  artist ?? '未知艺术家',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: ListenerColors.muted,
+                    fontSize: 12,
+                  ),
                 ),
               ),
             ],
@@ -213,6 +238,8 @@ class _AlbumTopBar extends StatelessWidget {
         ),
         ListenerCircleButton(
           icon: FLucideIcons.heart,
+          iconColor:
+              isStarred ? const Color(0xFFEF4444) : ListenerColors.foreground,
           onPress: onFavorite,
         ),
       ],
@@ -225,6 +252,7 @@ class _AlbumDetailHero extends StatelessWidget {
   final String? artist;
   final String? coverUrl;
   final int trackCount;
+  final VoidCallback? onArtist;
   final int duration;
 
   const _AlbumDetailHero({
@@ -232,6 +260,7 @@ class _AlbumDetailHero extends StatelessWidget {
     required this.artist,
     required this.coverUrl,
     required this.trackCount,
+    required this.onArtist,
     required this.duration,
   });
 
@@ -239,8 +268,8 @@ class _AlbumDetailHero extends StatelessWidget {
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
     final height = MediaQuery.sizeOf(context).height;
-    final coverSize = (width * 0.78).clamp(246.0, height * 0.34);
-    final resolvedCoverSize = coverSize.clamp(246.0, 304.0);
+    final maxCoverSize = (height * 0.34).clamp(190.0, 304.0);
+    final resolvedCoverSize = (width * 0.78).clamp(190.0, maxCoverSize);
     final discSize = resolvedCoverSize * 0.72;
 
     return Column(
@@ -311,14 +340,17 @@ class _AlbumDetailHero extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        Text(
-          artist ?? '未知艺术家',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            color: ListenerColors.softText,
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
+        FTappable(
+          onPress: onArtist,
+          child: Text(
+            artist ?? '未知艺术家',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: ListenerColors.softText,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
         const SizedBox(height: 14),
@@ -405,6 +437,58 @@ class _AlbumActionButton extends StatelessWidget {
     );
   }
 }
+
+Future<void> _toggleAlbumFavorite(
+  BuildContext context,
+  WidgetRef ref,
+  String albumId,
+  bool isStarred,
+) async {
+  final service = ref.read(favoriteServiceProvider);
+  final ok = isStarred
+      ? await service.unstarAlbum(albumId)
+      : await service.starAlbum(albumId);
+  if (!context.mounted) return;
+  if (!ok) {
+    showChansonToast(
+      context,
+      isStarred ? '取消收藏专辑失败' : '收藏专辑失败',
+      destructive: true,
+    );
+    return;
+  }
+  ref.invalidate(starredItemsProvider);
+  ref.invalidate(isAlbumStarredProvider(albumId));
+  showChansonToast(context, isStarred ? '已取消收藏专辑' : '已收藏专辑');
+}
+
+Future<void> _openArtist(
+  BuildContext context,
+  WidgetRef ref,
+  String artistName,
+) async {
+  final result = await ref.read(searchServiceProvider).search(artistName);
+  if (!context.mounted) return;
+
+  final normalizedArtist = _normalize(artistName);
+  final artist = result.artists
+      .where((artist) => _normalize(artist.name) == normalizedArtist)
+      .firstOrNull;
+
+  if (artist == null) {
+    context.push('/search?q=${Uri.encodeQueryComponent(artistName)}');
+    showChansonToast(context, '未直接匹配艺术家，已打开搜索结果');
+    return;
+  }
+
+  context.push('/artist-detail', extra: {
+    'artistId': artist.id,
+    'artistName': artist.name,
+    'coverArtId': artist.coverArt,
+  });
+}
+
+String _normalize(String? value) => (value ?? '').trim().toLowerCase();
 
 Future<void> _playAlbum(
   WidgetRef ref,

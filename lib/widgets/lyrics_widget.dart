@@ -13,6 +13,7 @@ class LyricsWidget extends ConsumerStatefulWidget {
   final String? title;
   final Duration position;
   final ValueChanged<Duration>? onSeek;
+  final bool expanded;
 
   const LyricsWidget({
     super.key,
@@ -20,6 +21,7 @@ class LyricsWidget extends ConsumerStatefulWidget {
     required this.title,
     this.position = Duration.zero,
     this.onSeek,
+    this.expanded = false,
   });
 
   @override
@@ -116,95 +118,124 @@ class _LyricsWidgetState extends ConsumerState<LyricsWidget> {
           _scrollToActive(activeIndex);
         });
 
-        return NotificationListener<ScrollNotification>(
-          onNotification: (notification) {
-            _handleScrollNotification(notification, parsed);
-            return false;
-          },
-          child: ListView.builder(
-            controller: _scrollController,
-            padding: const EdgeInsets.symmetric(
-              horizontal: 18,
-              vertical: _lyricsVerticalPadding,
-            ),
-            itemCount: parsed.length,
-            itemBuilder: (context, index) {
-              final isActive = index == activeIndex;
-              final distance = (index - activeIndex).abs();
-              final isAfterActive = index > activeIndex;
-              final opacity = switch (distance) {
-                0 => 1.0,
-                1 => isAfterActive ? 0.74 : 0.42,
-                2 => isAfterActive ? 0.52 : 0.22,
-                _ => 0.16,
-              };
-              final blur = switch (distance) {
-                0 => 0.0,
-                1 => isAfterActive ? 0.35 : 1.2,
-                2 => isAfterActive ? 0.8 : 1.8,
-                _ => 2.2,
-              };
-              final scale = switch (distance) {
-                0 => 1.12,
-                1 => isAfterActive ? 1.06 : 0.96,
-                2 => isAfterActive ? 1.01 : 0.90,
-                _ => isAfterActive ? 0.96 : 0.84,
-              };
-              final offsetY = switch (distance) {
-                0 => 0.0,
-                1 => isAfterActive ? 0.0 : -1.0,
-                2 => isAfterActive ? 1.0 : -1.5,
-                _ => isAfterActive ? 1.5 : -2.0,
-              };
+        return Stack(
+          children: [
+            NotificationListener<ScrollNotification>(
+              onNotification: (notification) {
+                _handleScrollNotification(notification, parsed);
+                return false;
+              },
+              child: ListView.builder(
+                controller: _scrollController,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: _lyricsVerticalPadding,
+                ),
+                itemCount: parsed.length,
+                itemBuilder: (context, index) {
+                  final isActive = index == activeIndex;
+                  final distance = (index - activeIndex).abs();
+                  final isAfterActive = index > activeIndex;
+                  final opacity = switch (distance) {
+                    0 => 1.0,
+                    1 => isAfterActive ? 0.74 : 0.42,
+                    2 => isAfterActive ? 0.52 : 0.22,
+                    _ => 0.16,
+                  };
+                  final blur = switch (distance) {
+                    0 => 0.0,
+                    1 => isAfterActive ? 0.35 : 1.2,
+                    2 => isAfterActive ? 0.8 : 1.8,
+                    _ => 2.2,
+                  };
+                  final scale = switch (distance) {
+                    0 => 1.12,
+                    1 => isAfterActive ? 1.06 : 0.96,
+                    2 => isAfterActive ? 1.01 : 0.90,
+                    _ => isAfterActive ? 0.96 : 0.84,
+                  };
+                  final offsetY = switch (distance) {
+                    0 => 0.0,
+                    1 => isAfterActive ? 0.0 : -1.0,
+                    2 => isAfterActive ? 1.0 : -1.5,
+                    _ => isAfterActive ? 1.5 : -2.0,
+                  };
 
-              return SizedBox(
-                height: _lyricsLineHeight,
-                child: Center(
-                  child: AnimatedOpacity(
-                    duration: const Duration(milliseconds: 220),
-                    curve: Curves.easeOut,
-                    opacity: opacity,
-                    child: AnimatedScale(
-                      duration: const Duration(milliseconds: 220),
-                      curve: Curves.easeOutCubic,
-                      scale: scale,
-                      child: Transform.translate(
-                        offset: Offset(0, offsetY),
-                        child: ImageFiltered(
-                          imageFilter: ImageFilter.blur(
-                            sigmaX: blur,
-                            sigmaY: blur,
-                          ),
-                          child: AnimatedDefaultTextStyle(
-                            duration: const Duration(milliseconds: 220),
-                            curve: Curves.easeOutCubic,
-                            style: TextStyle(
-                              color: isActive
-                                  ? ListenerColors.foreground
-                                  : ListenerColors.foreground.withValues(
-                                      alpha: opacity,
-                                    ),
-                              fontSize: isActive ? 19 : 15,
-                              height: 1.08,
-                              fontWeight:
-                                  isActive ? FontWeight.w800 : FontWeight.w600,
-                              letterSpacing: 0,
-                            ),
-                            child: Text(
-                              parsed[index].text,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              textAlign: TextAlign.center,
+                  return SizedBox(
+                    height: _lyricsLineHeight,
+                    child: Center(
+                      child: AnimatedOpacity(
+                        duration: const Duration(milliseconds: 220),
+                        curve: Curves.easeOut,
+                        opacity: opacity,
+                        child: AnimatedScale(
+                          duration: const Duration(milliseconds: 220),
+                          curve: Curves.easeOutCubic,
+                          scale: scale,
+                          child: Transform.translate(
+                            offset: Offset(0, offsetY),
+                            child: ImageFiltered(
+                              imageFilter: ImageFilter.blur(
+                                sigmaX: blur,
+                                sigmaY: blur,
+                              ),
+                              child: AnimatedDefaultTextStyle(
+                                duration: const Duration(milliseconds: 220),
+                                curve: Curves.easeOutCubic,
+                                style: TextStyle(
+                                  color: isActive
+                                      ? ListenerColors.foreground
+                                      : ListenerColors.foreground.withValues(
+                                          alpha: opacity,
+                                        ),
+                                  fontSize: isActive ? 19 : 15,
+                                  height: 1.08,
+                                  fontWeight: isActive
+                                      ? FontWeight.w800
+                                      : FontWeight.w600,
+                                  letterSpacing: 0,
+                                ),
+                                child: Text(
+                                  parsed[index].text,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
                             ),
                           ),
                         ),
                       ),
                     ),
+                  );
+                },
+              ),
+            ),
+            Positioned(
+              right: 12,
+              bottom: 12,
+              child: Tooltip(
+                message: widget.expanded ? '还原歌词' : '放大歌词',
+                child: Semantics(
+                  label: widget.expanded ? '还原歌词' : '放大歌词',
+                  button: true,
+                  child: FButton.icon(
+                    size: FButtonSizeVariant.sm,
+                    variant: FButtonVariant.secondary,
+                    onPress: widget.expanded
+                        ? () => Navigator.of(context).maybePop()
+                        : _openExpandedLyrics,
+                    child: Icon(
+                      widget.expanded
+                          ? FLucideIcons.minimize2
+                          : FLucideIcons.maximize2,
+                      size: 17,
+                    ),
                   ),
                 ),
-              );
-            },
-          ),
+              ),
+            ),
+          ],
         );
       },
       loading: () => const Center(child: FCircularProgress()),
@@ -265,6 +296,57 @@ class _LyricsWidgetState extends ConsumerState<LyricsWidget> {
         _isAutoScrolling = false;
       });
     });
+  }
+
+  void _openExpandedLyrics() {
+    Navigator.of(context).push(
+      PageRouteBuilder<void>(
+        opaque: false,
+        pageBuilder: (context, animation, secondaryAnimation) {
+          return FadeTransition(
+            opacity: animation,
+            child: FScaffold(
+              childPad: false,
+              child: ListenerPageBackground(
+                dramatic: true,
+                child: SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 18),
+                    child: Column(
+                      children: [
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: ListenerCircleButton(
+                            icon: FLucideIcons.chevronLeft,
+                            onPress: () => Navigator.of(context).pop(),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(28),
+                            child: LyricsWidget(
+                              artist: widget.artist,
+                              title: widget.title,
+                              position: widget.position,
+                              onSeek: widget.onSeek,
+                              expanded: true,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return child;
+        },
+      ),
+    );
   }
 
   void _handleScrollNotification(

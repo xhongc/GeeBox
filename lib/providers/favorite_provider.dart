@@ -35,3 +35,27 @@ final isSongStarredProvider = FutureProvider.family.autoDispose<bool, String>(
     }
   },
 );
+
+/// 单个专辑的收藏状态 Provider
+final isAlbumStarredProvider = FutureProvider.family.autoDispose<bool, String>(
+  (ref, albumId) async {
+    try {
+      final items = await ref.watch(starredItemsProvider.future);
+      return items.albums.any((album) => album.id == albumId);
+    } catch (e) {
+      return false;
+    }
+  },
+);
+
+/// 单个艺术家的收藏状态 Provider
+final isArtistStarredProvider = FutureProvider.family.autoDispose<bool, String>(
+  (ref, artistId) async {
+    try {
+      final items = await ref.watch(starredItemsProvider.future);
+      return items.artists.any((artist) => artist.id == artistId);
+    } catch (e) {
+      return false;
+    }
+  },
+);

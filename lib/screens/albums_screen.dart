@@ -25,6 +25,14 @@ class AlbumsScreen extends ConsumerStatefulWidget {
 
 class _AlbumsScreenState extends ConsumerState<AlbumsScreen> {
   String _sortType = 'newest';
+  final TextEditingController _filterController = TextEditingController();
+  String _filter = '';
+
+  @override
+  void dispose() {
+    _filterController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -49,21 +57,33 @@ class _AlbumsScreenState extends ConsumerState<AlbumsScreen> {
                   },
                 ),
                 const SizedBox(height: 18),
+                _AlbumFilterField(
+                  controller: _filterController,
+                  onChanged: (value) => setState(() => _filter = value),
+                  onClear: () {
+                    _filterController.clear();
+                    setState(() => _filter = '');
+                  },
+                ),
+                const SizedBox(height: 18),
                 albumsAsync.when(
-                  data: (albums) => _AlbumsSummary(
-                    sort: _sortType,
-                    count: albums.length,
-                    onPlayFirst: albums.isEmpty
-                        ? null
-                        : () => _playAlbum(ref, albums.first),
-                    onPlayRandom: albums.isEmpty
-                        ? null
-                        : () {
-                            final shuffled = List<Album>.from(albums)
-                              ..shuffle();
-                            _playAlbum(ref, shuffled.first);
-                          },
-                  ),
+                  data: (albums) {
+                    final filtered = _filterAlbums(albums, _filter);
+                    return _AlbumsSummary(
+                      sort: _sortType,
+                      count: filtered.length,
+                      onPlayFirst: filtered.isEmpty
+                          ? null
+                          : () => _playAlbum(ref, filtered.first),
+                      onPlayRandom: filtered.isEmpty
+                          ? null
+                          : () {
+                              final shuffled = List<Album>.from(filtered)
+                                ..shuffle();
+                              _playAlbum(ref, shuffled.first);
+                            },
+                    );
+                  },
                   loading: () => _AlbumsSummary(
                     sort: _sortType,
                     count: 0,
@@ -84,7 +104,8 @@ class _AlbumsScreenState extends ConsumerState<AlbumsScreen> {
           ),
           albumsAsync.when(
             data: (albums) {
-              if (albums.isEmpty) {
+              final filtered = _filterAlbums(albums, _filter);
+              if (filtered.isEmpty) {
                 return const SliverFillRemaining(
                   hasScrollBody: false,
                   child: _AlbumsEmpty(),
@@ -103,7 +124,7 @@ class _AlbumsScreenState extends ConsumerState<AlbumsScreen> {
                   ),
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
-                      final album = albums[index];
+                      final album = filtered[index];
                       return ListenerAlbumCard(
                         album: album,
                         imageUrl: album.coverArt == null
@@ -119,7 +140,7 @@ class _AlbumsScreenState extends ConsumerState<AlbumsScreen> {
                         }),
                       );
                     },
-                    childCount: albums.length,
+                    childCount: filtered.length,
                   ),
                 ),
               );
@@ -140,6 +161,60 @@ class _AlbumsScreenState extends ConsumerState<AlbumsScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _AlbumFilterField extends StatelessWidget {
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClear;
+
+  const _AlbumFilterField({
+    required this.controller,
+    required this.onChanged,
+    required this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.84),
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: ListenerShadows.soft,
+      ),
+      child: FTextField(
+        hint: '过滤专辑或艺术家',
+        style: FTextFieldStyleDelta.delta(
+          color: FVariantsValueDelta.delta([
+            FVariantValueDeltaOperation.all(Colors.transparent),
+          ]),
+          border: FVariantsValueDelta.delta([
+            FVariantValueDeltaOperation.all(InputBorder.none),
+          ]),
+        ),
+        control: FTextFieldControl.managed(
+          controller: controller,
+          onChange: (value) => onChanged(value.text),
+        ),
+        prefixBuilder: (context, style, variants) =>
+            FTextField.prefixIconBuilder(
+          context,
+          style,
+          variants,
+          const Icon(FLucideIcons.search),
+        ),
+        suffixBuilder: controller.text.isEmpty
+            ? null
+            : (context, style, variants) => FButton.icon(
+                  variant: FButtonVariant.ghost,
+                  size: FButtonSizeVariant.sm,
+                  onPress: onClear,
+                  child: const Icon(FLucideIcons.x),
+                ),
       ),
     );
   }
@@ -449,6 +524,15 @@ final albumListProvider =
     return albums;
   },
 );
+
+List<Album> _filterAlbums(List<Album> albums, String query) {
+  final normalized = query.trim().toLowerCase();
+  if (normalized.isEmpty) return albums;
+  return albums.where((album) {
+    return album.name.toLowerCase().contains(normalized) ||
+        (album.artist ?? '').toLowerCase().contains(normalized);
+  }).toList();
+}
 
 Future<void> _playAlbum(WidgetRef ref, Album album) async {
   final context = ref.context;

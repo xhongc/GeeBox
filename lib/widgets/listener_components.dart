@@ -1,11 +1,14 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:forui/forui.dart';
 
 import '../models/album.dart';
 import '../models/artist.dart';
 import '../models/song.dart';
+import '../providers/favorite_provider.dart';
+import 'forui_components.dart';
 
 class ListenerColors {
   static const foreground = Color(0xFF111827);
@@ -132,16 +135,21 @@ class _ListenerBlurredGlow extends StatelessWidget {
 class ListenerCircleButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback onPress;
+  final Color? iconColor;
+  final String? tooltip;
 
   const ListenerCircleButton({
     super.key,
     required this.icon,
     required this.onPress,
+    this.iconColor,
+    this.tooltip,
   });
 
   @override
   Widget build(BuildContext context) {
-    return FTappable(
+    final label = tooltip ?? _defaultCircleButtonLabel(icon);
+    final button = FTappable(
       onPress: onPress,
       builder: (context, states, child) {
         return AnimatedScale(
@@ -161,12 +169,36 @@ class ListenerCircleButton extends StatelessWidget {
                 ),
               ],
             ),
-            child: Icon(icon, color: ListenerColors.foreground, size: 20),
+            child: Icon(
+              icon,
+              color: iconColor ?? ListenerColors.foreground,
+              size: 20,
+            ),
           ),
         );
       },
     );
+    if (label == null) return button;
+    return Tooltip(
+      message: label,
+      child: Semantics(
+        label: label,
+        button: true,
+        child: button,
+      ),
+    );
   }
+}
+
+String? _defaultCircleButtonLabel(IconData icon) {
+  if (icon == FLucideIcons.chevronLeft) return '返回';
+  if (icon == FLucideIcons.search) return '搜索';
+  if (icon == FLucideIcons.userRound) return '账号';
+  if (icon == FLucideIcons.heart) return '收藏';
+  if (icon == FLucideIcons.refreshCw || icon == FLucideIcons.refreshCcw) {
+    return '刷新';
+  }
+  return null;
 }
 
 class ListenerCoverArt extends StatelessWidget {
@@ -525,15 +557,16 @@ class ListenerGenreCard extends StatelessWidget {
             constraints: const BoxConstraints(minHeight: 74),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.74),
               borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF94A3B8).withValues(alpha: 0.10),
-                  blurRadius: 22,
-                  offset: const Offset(0, 10),
-                ),
-              ],
+              gradient: LinearGradient(
+                begin: Alignment.topRight,
+                end: Alignment.bottomLeft,
+                colors: [
+                  const Color(0xFFBFDBFE).withValues(alpha: 0.32),
+                  Colors.white.withValues(alpha: 0.78),
+                ],
+              ),
+              boxShadow: ListenerShadows.soft,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -568,7 +601,7 @@ class ListenerGenreCard extends StatelessWidget {
   }
 }
 
-class ListenerTrackRow extends StatelessWidget {
+class ListenerTrackRow extends ConsumerWidget {
   final Song song;
   final String? imageUrl;
   final VoidCallback onPress;
@@ -585,7 +618,10 @@ class ListenerTrackRow extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isStarred = ref.watch(isSongStarredProvider(song.id)).valueOrNull;
+    final favoriteActive = isStarred ?? false;
+
     return FTappable(
       onPress: onPress,
       builder: (context, states, child) {
@@ -598,13 +634,6 @@ class ListenerTrackRow extends StatelessWidget {
                 ? Colors.white.withValues(alpha: 0.7)
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF94A3B8).withValues(alpha: 0.08),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
           ),
           child: Row(
             children: [
@@ -666,10 +695,18 @@ class ListenerTrackRow extends StatelessWidget {
                         FButton.icon(
                           variant: FButtonVariant.ghost,
                           size: FButtonSizeVariant.sm,
-                          onPress: onFavorite,
-                          child: const Icon(
+                          onPress: onFavorite ??
+                              () => _toggleSongFavorite(
+                                    context,
+                                    ref,
+                                    song.id,
+                                    favoriteActive,
+                                  ),
+                          child: Icon(
                             FLucideIcons.heart,
-                            color: Color(0xFFCBD5E1),
+                            color: favoriteActive
+                                ? const Color(0xFFEF4444)
+                                : const Color(0xFFCBD5E1),
                             size: 19,
                           ),
                         ),
@@ -697,6 +734,31 @@ class ListenerTrackRow extends StatelessWidget {
       },
     );
   }
+}
+
+Future<void> _toggleSongFavorite(
+  BuildContext context,
+  WidgetRef ref,
+  String songId,
+  bool isStarred,
+) async {
+  final service = ref.read(favoriteServiceProvider);
+  final ok = isStarred
+      ? await service.unstarSong(songId)
+      : await service.starSong(songId);
+  if (!context.mounted) return;
+  if (!ok) {
+    showChansonToast(
+      context,
+      isStarred ? '取消收藏失败' : '收藏失败',
+      destructive: true,
+    );
+    return;
+  }
+  ref.invalidate(starredItemsProvider);
+  ref.invalidate(starredSongsProvider);
+  ref.invalidate(isSongStarredProvider(songId));
+  showChansonToast(context, isStarred ? '已取消收藏' : '已添加到我喜欢的音乐');
 }
 
 String formatSongDuration(int? seconds) {

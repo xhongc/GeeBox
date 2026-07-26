@@ -9,8 +9,8 @@ import '../models/genre.dart';
 import '../models/song.dart';
 import '../providers/audio_player_provider.dart';
 import '../providers/music_repository_provider.dart';
+import '../providers/play_history_provider.dart';
 import '../providers/subsonic_provider.dart';
-import '../widgets/forui_components.dart';
 import '../widgets/listener_components.dart';
 import '../widgets/listener_track_action_sheet.dart';
 import 'settings_screen.dart';
@@ -21,6 +21,10 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final homeAsync = ref.watch(listenerHomeProvider);
+    final recentlyPlayedAsync = ref.watch(recentlyPlayedProvider);
+    final frequentAlbumsAsync = ref.watch(frequentAlbumsProvider);
+    final recentlyAddedSongsAsync =
+        ref.watch(songsLibraryProvider('recently-added'));
 
     return CustomScrollView(
       slivers: [
@@ -73,6 +77,20 @@ class HomeScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 28),
               ListenerSectionHeader(
+                title: '最近播放',
+                actionLabel: '全部',
+                onAction: () => context.push('/songs'),
+              ),
+              recentlyPlayedAsync.when(
+                data: (songs) => _SongList(songs: songs, ref: ref),
+                loading: () => const _TrackListLoading(),
+                error: (_, __) => _InlineError(
+                  label: '无法加载最近播放',
+                  onRetry: () => ref.invalidate(recentlyPlayedProvider),
+                ),
+              ),
+              const SizedBox(height: 28),
+              ListenerSectionHeader(
                 title: '新专辑',
                 actionLabel: '全部',
                 onAction: () => context.push('/albums'),
@@ -83,6 +101,20 @@ class HomeScreen extends ConsumerWidget {
                 error: (_, __) => _InlineError(
                   label: '无法加载专辑',
                   onRetry: () => ref.invalidate(listenerHomeProvider),
+                ),
+              ),
+              const SizedBox(height: 28),
+              ListenerSectionHeader(
+                title: '常听专辑',
+                actionLabel: '全部',
+                onAction: () => context.push('/albums'),
+              ),
+              frequentAlbumsAsync.when(
+                data: (albums) => _AlbumGrid(albums: albums, ref: ref),
+                loading: () => const _ThreeColumnLoading(),
+                error: (_, __) => _InlineError(
+                  label: '无法加载常听专辑',
+                  onRetry: () => ref.invalidate(frequentAlbumsProvider),
                 ),
               ),
               const SizedBox(height: 28),
@@ -115,16 +147,17 @@ class HomeScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 28),
               ListenerSectionHeader(
-                title: '歌曲列表',
+                title: '最近添加',
                 actionLabel: '全部',
                 onAction: () => context.push('/songs'),
               ),
-              homeAsync.when(
-                data: (home) => _SongList(songs: home.randomSongs, ref: ref),
+              recentlyAddedSongsAsync.when(
+                data: (songs) => _SongList(songs: songs, ref: ref),
                 loading: () => const _TrackListLoading(),
                 error: (_, __) => _InlineError(
-                  label: '无法加载歌曲',
-                  onRetry: () => ref.invalidate(listenerHomeProvider),
+                  label: '无法加载最近添加',
+                  onRetry: () =>
+                      ref.invalidate(songsLibraryProvider('recently-added')),
                 ),
               ),
             ]),
@@ -636,7 +669,6 @@ class _SongList extends StatelessWidget {
           song: song,
           imageUrl: imageUrl,
           onPress: () => _playSongs(ref, songs, initialIndex: index),
-          onFavorite: () => showChansonToast(context, '收藏功能将在喜爱页统一管理'),
           onMore: () => showListenerTrackActionSheet(
             context: context,
             ref: ref,

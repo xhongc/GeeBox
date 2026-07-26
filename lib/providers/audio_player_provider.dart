@@ -49,3 +49,9 @@ final playModeProvider = StreamProvider<PlayMode>((ref) {
   final service = ref.watch(audioPlayerServiceProvider);
   return service.playModeStream;
 });
+
+// 播放错误 Provider
+final playbackErrorProvider = StreamProvider<String?>((ref) {
+  final service = ref.watch(audioPlayerServiceProvider);
+  return service.playbackErrorStream;
+});

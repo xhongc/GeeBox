@@ -30,6 +30,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   final TextEditingController _searchController = TextEditingController();
   Timer? _debounce;
   bool _isSearching = false;
+  String? _searchError;
+  String? _lastQuery;
 
   @override
   void initState() {
@@ -77,16 +79,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       final searchService = ref.read(searchServiceProvider);
       final result = await searchService.search(trimmed);
       if (!mounted) return;
+      _lastQuery = trimmed;
+      _searchError = null;
       ref.read(searchResultProvider.notifier).state = result;
       ref.invalidate(searchHistoryProvider);
     } catch (error) {
       if (!mounted) return;
+      _lastQuery = trimmed;
+      _searchError = '$error';
       showChansonToast(context, '搜索失败: $error', destructive: true);
-      ref.read(searchResultProvider.notifier).state = SearchResult(
-        songs: [],
-        albums: [],
-        artists: [],
-      );
     } finally {
       if (mounted) setState(() => _isSearching = false);
     }
@@ -95,6 +96,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   void _clearSearch() {
     _debounce?.cancel();
     _searchController.clear();
+    _searchError = null;
     ref.read(searchResultProvider.notifier).state = null;
     setState(() {});
   }
@@ -129,6 +131,19 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                         icon: FLucideIcons.loaderCircle,
                         title: '正在搜索...',
                         subtitle: '正在整理歌曲、专辑和艺术家结果。',
+                      )
+                    else if (_searchError != null)
+                      _SearchState(
+                        icon: FLucideIcons.triangleAlert,
+                        title: '搜索失败',
+                        subtitle: '服务器暂时没有返回结果，请稍后重试。',
+                        action: FButton(
+                          variant: FButtonVariant.ghost,
+                          onPress: _lastQuery == null
+                              ? null
+                              : () => _performSearch(_lastQuery!),
+                          child: const Text('重试'),
+                        ),
                       )
                     else if (!hasKeyword)
                       _SearchHistory(
@@ -302,26 +317,38 @@ class _SearchHistory extends ConsumerWidget {
               },
             ),
             for (final item in history)
-              Container(
-                margin: const EdgeInsets.only(bottom: 10),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.74),
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: ListenerShadows.soft,
-                ),
-                child: FTile(
-                  prefix: const Icon(FLucideIcons.history),
-                  title: Text(item.query),
-                  suffix: FButton.icon(
-                    variant: FButtonVariant.ghost,
-                    size: FButtonSizeVariant.sm,
-                    onPress: () async {
-                      await searchService.deleteSearchHistory(item.query);
-                      ref.invalidate(searchHistoryProvider);
-                    },
-                    child: const Icon(FLucideIcons.x),
+              Dismissible(
+                key: ValueKey('search-history-${item.query}'),
+                direction: DismissDirection.endToStart,
+                background: Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 18),
+                  alignment: Alignment.centerRight,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFDC2626),
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                  onPress: () => onSelect(item.query),
+                  child: const Icon(
+                    FLucideIcons.trash2,
+                    color: Colors.white,
+                  ),
+                ),
+                onDismissed: (_) async {
+                  await searchService.deleteSearchHistory(item.query);
+                  ref.invalidate(searchHistoryProvider);
+                },
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.74),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: ListenerShadows.soft,
+                  ),
+                  child: FTile(
+                    prefix: const Icon(FLucideIcons.history),
+                    title: Text(item.query),
+                    onPress: () => onSelect(item.query),
+                  ),
                 ),
               ),
           ],
@@ -346,33 +373,55 @@ class _SearchHistory extends ConsumerWidget {
   }
 }
 
-class _SearchResults extends ConsumerWidget {
+class _SearchResults extends ConsumerStatefulWidget {
   final SearchResult result;
 
   const _SearchResults({required this.result});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_SearchResults> createState() => _SearchResultsState();
+}
+
+class _SearchResultsState extends ConsumerState<_SearchResults> {
+  bool _showAllArtists = false;
+  bool _showAllAlbums = false;
+  bool _showAllSongs = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final result = widget.result;
+    final artists = _showAllArtists ? result.artists : result.artists.take(3);
+    final albums = _showAllAlbums ? result.albums : result.albums.take(4);
+    final songs = _showAllSongs ? result.songs : result.songs.take(8);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (result.artists.isNotEmpty) ...[
           ListenerSectionHeader(
             title: '艺术家',
-            actionLabel: '${result.artists.length}',
+            actionLabel:
+                _sectionActionLabel(_showAllArtists, result.artists.length, 3),
+            onAction: result.artists.length > 3
+                ? () => setState(() => _showAllArtists = !_showAllArtists)
+                : null,
           ),
-          for (final artist in result.artists) _ArtistResultRow(artist: artist),
+          for (final artist in artists) _ArtistResultRow(artist: artist),
           const SizedBox(height: 24),
         ],
         if (result.albums.isNotEmpty) ...[
           ListenerSectionHeader(
             title: '专辑',
-            actionLabel: '${result.albums.length}',
+            actionLabel:
+                _sectionActionLabel(_showAllAlbums, result.albums.length, 4),
+            onAction: result.albums.length > 4
+                ? () => setState(() => _showAllAlbums = !_showAllAlbums)
+                : null,
           ),
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            itemCount: result.albums.length,
+            itemCount: albums.length,
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
               mainAxisSpacing: 18,
@@ -380,7 +429,7 @@ class _SearchResults extends ConsumerWidget {
               childAspectRatio: 0.72,
             ),
             itemBuilder: (context, index) {
-              final album = result.albums[index];
+              final album = albums.elementAt(index);
               return ListenerAlbumCard(
                 album: album,
                 imageUrl: _albumCoverUrl(ref, album),
@@ -398,9 +447,36 @@ class _SearchResults extends ConsumerWidget {
         if (result.songs.isNotEmpty) ...[
           ListenerSectionHeader(
             title: '歌曲',
-            actionLabel: '${result.songs.length}',
+            actionLabel:
+                _sectionActionLabel(_showAllSongs, result.songs.length, 8),
+            onAction: result.songs.length > 8
+                ? () => setState(() => _showAllSongs = !_showAllSongs)
+                : null,
           ),
-          for (final (index, song) in result.songs.indexed)
+          Row(
+            children: [
+              FButton(
+                size: FButtonSizeVariant.sm,
+                prefix: const Icon(FLucideIcons.play, size: 16),
+                onPress: () => _playSongs(
+                  ref,
+                  result.songs,
+                  initialIndex: 0,
+                ),
+                child: const Text('播放全部'),
+              ),
+              const SizedBox(width: 10),
+              FButton(
+                size: FButtonSizeVariant.sm,
+                variant: FButtonVariant.secondary,
+                prefix: const Icon(FLucideIcons.shuffle, size: 16),
+                onPress: () => _shuffleSongs(ref, result.songs),
+                child: const Text('打乱'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          for (final (index, song) in songs.indexed)
             Builder(
               builder: (context) {
                 final imageUrl = _songCoverUrl(ref, song);
@@ -409,7 +485,6 @@ class _SearchResults extends ConsumerWidget {
                   imageUrl: imageUrl,
                   onPress: () =>
                       _playSongs(ref, result.songs, initialIndex: index),
-                  onFavorite: () => showChansonToast(context, '收藏功能将在喜爱页统一管理'),
                   onMore: () => showListenerTrackActionSheet(
                     context: context,
                     ref: ref,
@@ -425,6 +500,11 @@ class _SearchResults extends ConsumerWidget {
       ],
     );
   }
+}
+
+String _sectionActionLabel(bool expanded, int count, int limit) {
+  if (count <= limit) return '$count';
+  return expanded ? '收起' : '更多 $count';
 }
 
 class _ArtistResultRow extends ConsumerWidget {
@@ -553,4 +633,10 @@ Future<void> _playSongs(
     initialIndex,
     (songId) => subsonicService.getStreamUrl(songId),
   );
+}
+
+Future<void> _shuffleSongs(WidgetRef ref, List<Song> songs) async {
+  if (songs.isEmpty) return;
+  final shuffled = List<Song>.from(songs)..shuffle();
+  await _playSongs(ref, shuffled, initialIndex: 0);
 }

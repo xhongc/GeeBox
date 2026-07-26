@@ -46,10 +46,7 @@ class PlayQueueScreen extends ConsumerWidget {
                 _QueueActions(
                   onShuffle: () => _shuffleQueue(ref, playlist),
                   onRandom: () => _playRandom(ref, playlist),
-                  onClear: () {
-                    ref.read(audioPlayerServiceProvider).clearQueue();
-                    showChansonToast(context, '已清空播放队列');
-                  },
+                  onClear: () => _confirmClearQueue(context, ref),
                 ),
                 const SizedBox(height: 18),
               ],
@@ -75,22 +72,46 @@ class PlayQueueScreen extends ConsumerWidget {
                   ),
                 )
               else
-                for (final (index, song) in playlist.indexed)
-                  _QueueRow(
-                    song: song,
-                    index: index,
-                    isCurrent: index == currentIndex,
-                    imageUrl: _coverUrl(ref, song),
-                    onPress: () => _playAt(ref, playlist, index),
-                    onRemove: index == currentIndex
-                        ? null
-                        : () {
-                            ref
-                                .read(audioPlayerServiceProvider)
-                                .removeFromQueue(index);
-                            showChansonToast(context, '已从队列中移除 ${song.title}');
-                          },
+                ReorderableListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  proxyDecorator: (child, index, animation) => Material(
+                    color: Colors.transparent,
+                    child: ScaleTransition(
+                      scale: Tween<double>(begin: 1, end: 1.02).animate(
+                        CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOutCubic,
+                        ),
+                      ),
+                      child: child,
+                    ),
                   ),
+                  onReorderItem: (oldIndex, newIndex) {
+                    ref
+                        .read(audioPlayerServiceProvider)
+                        .moveInQueue(oldIndex, newIndex);
+                  },
+                  itemCount: playlist.length,
+                  itemBuilder: (context, index) {
+                    final song = playlist[index];
+                    return _QueueRow(
+                      key: ValueKey('queue-${song.id}-$index'),
+                      song: song,
+                      index: index,
+                      isCurrent: index == currentIndex,
+                      imageUrl: _coverUrl(ref, song),
+                      onPress: () => _playAt(ref, playlist, index),
+                      onMore: () => _showQueueItemActions(
+                        context,
+                        ref,
+                        playlist,
+                        index,
+                        currentIndex,
+                      ),
+                    );
+                  },
+                ),
             ]),
           ),
         ),
@@ -322,15 +343,16 @@ class _QueueRow extends StatelessWidget {
   final bool isCurrent;
   final String? imageUrl;
   final VoidCallback onPress;
-  final VoidCallback? onRemove;
+  final VoidCallback onMore;
 
   const _QueueRow({
+    super.key,
     required this.song,
     required this.index,
     required this.isCurrent,
     required this.imageUrl,
     required this.onPress,
-    required this.onRemove,
+    required this.onMore,
   });
 
   @override
@@ -399,10 +421,21 @@ class _QueueRow extends StatelessWidget {
               FButton.icon(
                 variant: FButtonVariant.ghost,
                 size: FButtonSizeVariant.sm,
-                onPress: onRemove,
+                onPress: onMore,
                 child: const Icon(
-                  FLucideIcons.minus,
+                  FLucideIcons.ellipsis,
                   color: ListenerColors.muted,
+                ),
+              ),
+              ReorderableDragStartListener(
+                index: index,
+                child: const Padding(
+                  padding: EdgeInsets.only(left: 4),
+                  child: Icon(
+                    FLucideIcons.gripVertical,
+                    color: ListenerColors.muted,
+                    size: 18,
+                  ),
                 ),
               ),
             ],
@@ -437,4 +470,168 @@ Future<void> _playRandom(WidgetRef ref, List<Song> songs) async {
   if (songs.isEmpty) return;
   final index = DateTime.now().microsecond % songs.length;
   await _playAt(ref, songs, index);
+}
+
+void _showQueueItemActions(
+  BuildContext context,
+  WidgetRef ref,
+  List<Song> playlist,
+  int index,
+  int currentIndex,
+) {
+  final song = playlist[index];
+  showFSheet<void>(
+    context: context,
+    side: FLayout.btt,
+    useSafeArea: true,
+    mainAxisMaxRatio: 0.66,
+    builder: (context) => DecoratedBox(
+      decoration: const BoxDecoration(gradient: ListenerGradients.shell),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 10, 18, 22),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 42,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFCBD5E1),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+              const SizedBox(height: 18),
+              _QueueSheetAction(
+                icon: FLucideIcons.listEnd,
+                title: '移到下一首',
+                enabled: index != currentIndex,
+                onPress: () {
+                  final targetIndex =
+                      index < currentIndex ? currentIndex : currentIndex + 1;
+                  final clampedTarget =
+                      targetIndex.clamp(0, playlist.length - 1).toInt();
+                  ref
+                      .read(audioPlayerServiceProvider)
+                      .moveInQueue(index, clampedTarget);
+                  Navigator.pop(context);
+                  showChansonToast(context, '已移到下一首');
+                },
+              ),
+              _QueueSheetAction(
+                icon: FLucideIcons.arrowUpToLine,
+                title: '移到队首',
+                enabled: index != 0,
+                onPress: () {
+                  ref.read(audioPlayerServiceProvider).moveInQueue(index, 0);
+                  Navigator.pop(context);
+                  showChansonToast(context, '已移到队首');
+                },
+              ),
+              _QueueSheetAction(
+                icon: FLucideIcons.play,
+                title: '从这里开始播放',
+                onPress: () {
+                  Navigator.pop(context);
+                  _playAt(ref, playlist, index);
+                },
+              ),
+              _QueueSheetAction(
+                icon: FLucideIcons.trash2,
+                title: '从队列移除',
+                destructive: true,
+                enabled: index != currentIndex,
+                onPress: () {
+                  ref.read(audioPlayerServiceProvider).removeFromQueue(index);
+                  Navigator.pop(context);
+                  showChansonToast(context, '已从队列中移除 ${song.title}');
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _QueueSheetAction extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final VoidCallback onPress;
+  final bool enabled;
+  final bool destructive;
+
+  const _QueueSheetAction({
+    required this.icon,
+    required this.title,
+    required this.onPress,
+    this.enabled = true,
+    this.destructive = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color =
+        destructive ? const Color(0xFFDC2626) : ListenerColors.foreground;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.78),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: ListenerShadows.soft,
+      ),
+      child: FTile(
+        prefix: Icon(icon, color: enabled ? color : ListenerColors.muted),
+        title: Text(
+          title,
+          style: TextStyle(color: enabled ? color : ListenerColors.muted),
+        ),
+        onPress: enabled ? onPress : null,
+      ),
+    );
+  }
+}
+
+void _confirmClearQueue(BuildContext context, WidgetRef ref) {
+  showFDialog(
+    context: context,
+    builder: (context, style, animation) => FDialog(
+      animation: animation,
+      builder: (context, style) => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('清空播放队列', style: style.titleTextStyle),
+            const SizedBox(height: 8),
+            Text('这会停止当前播放并移除队列中的全部歌曲。', style: style.bodyTextStyle),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                FButton(
+                  variant: FButtonVariant.outline,
+                  onPress: () => Navigator.pop(context),
+                  child: const Text('取消'),
+                ),
+                const SizedBox(width: 8),
+                FButton(
+                  variant: FButtonVariant.destructive,
+                  onPress: () {
+                    ref.read(audioPlayerServiceProvider).clearQueue();
+                    Navigator.pop(context);
+                    showChansonToast(context, '已清空播放队列');
+                  },
+                  child: const Text('清空'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }

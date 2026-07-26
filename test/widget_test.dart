@@ -248,12 +248,19 @@ void main() {
         playlist: songs,
         currentIndex: 0,
         playing: true,
+        position: const Duration(seconds: 30),
+        duration: const Duration(seconds: 120),
       ),
     );
 
     expect(find.text('Midnight Signal'), findsOneWidget);
     expect(find.text('Nova'), findsOneWidget);
     expect(find.byIcon(FLucideIcons.pause), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+    final progressIndicator = tester.widget<CircularProgressIndicator>(
+      find.byType(CircularProgressIndicator),
+    );
+    expect(progressIndicator.value, 0.25);
 
     await _pumpPage(
       tester,
@@ -274,6 +281,36 @@ void main() {
     await _expectText(tester, 'Glass Horizon', reason: 'PlayQueueScreen row');
   });
 
+  testWidgets('player shows playback details and nests sleep action',
+      (tester) async {
+    final songs = subsonicService._songs;
+
+    await _pumpPage(
+      tester,
+      subsonicService,
+      const PlayerScreen(),
+      extraOverrides: _audioStateOverrides(
+        currentSong: songs.first,
+        playlist: songs,
+        currentIndex: 0,
+        playing: true,
+        duration: const Duration(seconds: 245),
+      ),
+    );
+
+    expect(find.text('播放信息'), findsNothing);
+    expect(find.text('Aurora Archive'), findsWidgets);
+    expect(find.text('2024'), findsWidgets);
+    expect(find.text('Synthwave'), findsWidgets);
+    expect(find.text('320 kbps'), findsOneWidget);
+    expect(find.text('MP3'), findsOneWidget);
+    expect(find.text('输出'), findsNothing);
+    expect(find.text('已连接'), findsNothing);
+    expect(find.text('加载中'), findsNothing);
+    expect(find.text('睡眠定时器'), findsNothing);
+    expect(find.byIcon(FLucideIcons.ellipsis), findsOneWidget);
+  });
+
   test('AudioPlayerService updates queue and current song when playing',
       () async {
     final backend = _FakeAudioPlaybackBackend();
@@ -288,6 +325,98 @@ void main() {
     expect(service.currentSong, songs[1]);
     expect(backend.lastUrl, 'https://example.test/stream/song-2');
     expect(backend.playCalls, 1);
+
+    await service.dispose();
+  });
+
+  test('AudioPlayerService advances when playback completes', () async {
+    final backend = _FakeAudioPlaybackBackend();
+    final service = AudioPlayerService.testing(backend);
+    final songs = subsonicService._songs;
+
+    await service.setPlaylist(songs);
+    await service.playAtIndex(0, (id) => 'https://example.test/stream/$id');
+    backend.complete();
+    await Future<void>.delayed(Duration.zero);
+
+    expect(service.currentIndex, 1);
+    expect(service.currentSong, songs[1]);
+    expect(backend.lastUrl, 'https://example.test/stream/song-2');
+
+    await service.dispose();
+  });
+
+  test(
+      'AudioPlayerService previous seeks to start after playback has progressed',
+      () async {
+    final backend = _FakeAudioPlaybackBackend();
+    final service = AudioPlayerService.testing(backend);
+    final songs = subsonicService._songs;
+
+    await service.setPlaylist(songs, initialIndex: 1);
+    await service.playAtIndex(1, (id) => 'https://example.test/stream/$id');
+    backend.emitPosition(const Duration(seconds: 8));
+    await Future<void>.delayed(Duration.zero);
+
+    await service.previous((id) => 'https://example.test/stream/$id');
+
+    expect(service.currentIndex, 1);
+    expect(backend.lastSeek, Duration.zero);
+
+    await service.dispose();
+  });
+
+  test('AudioPlayerService previous follows shuffle history', () async {
+    final backend = _FakeAudioPlaybackBackend();
+    final service = AudioPlayerService.testing(backend);
+    final songs = subsonicService._songs;
+
+    await service.setPlaylist(songs);
+    service.setPlayMode(PlayMode.shuffle);
+    await service.playAtIndex(0, (id) => 'https://example.test/stream/$id');
+    await service.playAtIndex(2, (id) => 'https://example.test/stream/$id');
+
+    await service.previous((id) => 'https://example.test/stream/$id');
+
+    expect(service.currentIndex, 0);
+    expect(service.currentSong, songs[0]);
+    expect(backend.lastUrl, 'https://example.test/stream/song-1');
+
+    await service.dispose();
+  });
+
+  test('AudioPlayerService reports playback errors', () async {
+    final backend = _FakeAudioPlaybackBackend()..failSetUrl = true;
+    final service = AudioPlayerService.testing(backend);
+    final songs = subsonicService._songs;
+    final errors = <String?>[];
+    final sub = service.playbackErrorStream.listen(errors.add);
+
+    await service.setPlaylist(songs);
+    await service.playAtIndex(0, (id) => 'https://example.test/stream/$id');
+    await Future<void>.delayed(Duration.zero);
+
+    expect(errors.last, '播放失败，已跳过这首歌');
+
+    await sub.cancel();
+    await service.dispose();
+  });
+
+  test('AudioPlayerService skips to next song when playback fails', () async {
+    final backend = _FakeAudioPlaybackBackend()
+      ..failSetUrlCount = 1
+      ..requireStopAfterSetUrlFailure = true;
+    final service = AudioPlayerService.testing(backend);
+    final songs = subsonicService._songs;
+
+    await service.setPlaylist(songs);
+    await service.playAtIndex(0, (id) => 'https://example.test/stream/$id');
+
+    expect(service.currentIndex, 1);
+    expect(service.currentSong, songs[1]);
+    expect(backend.lastUrl, 'https://example.test/stream/song-2');
+    expect(backend.playCalls, 1);
+    expect(backend.stopCalls, 1);
 
     await service.dispose();
   });
@@ -373,8 +502,6 @@ void main() {
     await _expectText(tester, '暂无新专辑', reason: 'HomeScreen empty albums');
     await _expectText(tester, '暂无艺术家', reason: 'HomeScreen empty artists');
     await _expectText(tester, '暂无风格', reason: 'HomeScreen empty genres');
-    await _expectText(tester, '暂无歌曲', reason: 'HomeScreen empty songs');
-
     await _expectPageBuilds(
       tester,
       subsonicService,
@@ -426,10 +553,15 @@ class _FakeAudioPlaybackBackend implements AudioPlaybackBackend {
   final _durationController = StreamController<Duration?>.broadcast();
 
   String? lastUrl;
+  Duration? lastSeek;
   int playCalls = 0;
   int pauseCalls = 0;
   int stopCalls = 0;
   bool _playing = false;
+  bool failSetUrl = false;
+  int failSetUrlCount = 0;
+  bool requireStopAfterSetUrlFailure = false;
+  bool _needsStopAfterSetUrlFailure = false;
 
   @override
   bool get playing => _playing;
@@ -445,6 +577,16 @@ class _FakeAudioPlaybackBackend implements AudioPlaybackBackend {
 
   @override
   Future<void> setUrl(String url) async {
+    if (_needsStopAfterSetUrlFailure) {
+      throw StateError('setUrl failed until stop');
+    }
+    if (failSetUrl || failSetUrlCount > 0) {
+      if (failSetUrlCount > 0) {
+        failSetUrlCount -= 1;
+      }
+      _needsStopAfterSetUrlFailure = requireStopAfterSetUrlFailure;
+      throw StateError('setUrl failed');
+    }
     lastUrl = url;
   }
 
@@ -465,12 +607,14 @@ class _FakeAudioPlaybackBackend implements AudioPlaybackBackend {
   @override
   Future<void> stop() async {
     stopCalls += 1;
+    _needsStopAfterSetUrlFailure = false;
     _playing = false;
     _playerStateController.add(PlayerState(false, ProcessingState.idle));
   }
 
   @override
   Future<void> seek(Duration position) async {
+    lastSeek = position;
     _positionController.add(position);
   }
 
@@ -485,6 +629,15 @@ class _FakeAudioPlaybackBackend implements AudioPlaybackBackend {
     await _playerStateController.close();
     await _positionController.close();
     await _durationController.close();
+  }
+
+  void complete() {
+    _playing = false;
+    _playerStateController.add(PlayerState(false, ProcessingState.completed));
+  }
+
+  void emitPosition(Duration position) {
+    _positionController.add(position);
   }
 }
 
@@ -718,6 +871,8 @@ class _FakeSubsonicService extends SubsonicService {
       duration: 245,
       year: 2024,
       genre: 'Synthwave',
+      bitRate: 320,
+      contentType: 'audio/mpeg',
     ),
     Song(
       id: 'song-2',

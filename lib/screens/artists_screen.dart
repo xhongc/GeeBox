@@ -19,6 +19,7 @@ class ArtistsScreen extends ConsumerStatefulWidget {
 
 class _ArtistsScreenState extends ConsumerState<ArtistsScreen> {
   String _sortValue = 'most-albums';
+  String? _initialFilter;
 
   @override
   Widget build(BuildContext context) {
@@ -36,7 +37,10 @@ class _ArtistsScreenState extends ConsumerState<ArtistsScreen> {
               delegate: SliverChildListDelegate([
                 _ArtistsHero(
                   sortValue: _sortValue,
-                  onSort: (value) => setState(() => _sortValue = value),
+                  onSort: (value) => setState(() {
+                    _sortValue = value;
+                    if (value != 'a-z') _initialFilter = null;
+                  }),
                   onRefresh: () => ref.invalidate(artistsProvider),
                   count: filteredSnapshot.length,
                   onPlayFirst: filteredSnapshot.isEmpty
@@ -51,6 +55,17 @@ class _ArtistsScreenState extends ConsumerState<ArtistsScreen> {
                         },
                 ),
                 const SizedBox(height: 18),
+                if (_sortValue == 'a-z' && filteredSnapshot.isNotEmpty) ...[
+                  _ArtistInitialIndex(
+                    initials: _artistInitials(artistsAsync.valueOrNull ?? []),
+                    selected: _initialFilter,
+                    onSelect: (value) => setState(() {
+                      _initialFilter = value == _initialFilter ? null : value;
+                    }),
+                    onAll: () => setState(() => _initialFilter = null),
+                  ),
+                  const SizedBox(height: 16),
+                ],
                 artistsAsync.when(
                   data: (artists) {
                     final filtered = _filteredArtists(artists);
@@ -126,7 +141,89 @@ class _ArtistsScreenState extends ConsumerState<ArtistsScreen> {
         );
     }
 
+    if (_initialFilter != null) {
+      filtered.removeWhere(
+          (artist) => _artistInitial(artist.name) != _initialFilter);
+    }
+
     return filtered;
+  }
+}
+
+class _ArtistInitialIndex extends StatelessWidget {
+  final List<String> initials;
+  final String? selected;
+  final ValueChanged<String> onSelect;
+  final VoidCallback onAll;
+
+  const _ArtistInitialIndex({
+    required this.initials,
+    required this.selected,
+    required this.onSelect,
+    required this.onAll,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          _InitialPill(
+            label: '全部',
+            active: selected == null,
+            onPress: onAll,
+          ),
+          const SizedBox(width: 8),
+          for (final initial in initials) ...[
+            _InitialPill(
+              label: initial,
+              active: selected == initial,
+              onPress: () => onSelect(initial),
+            ),
+            const SizedBox(width: 8),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _InitialPill extends StatelessWidget {
+  final String label;
+  final bool active;
+  final VoidCallback onPress;
+
+  const _InitialPill({
+    required this.label,
+    required this.active,
+    required this.onPress,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return FTappable(
+      onPress: onPress,
+      builder: (context, states, child) => AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        decoration: BoxDecoration(
+          color: active
+              ? ListenerColors.foreground
+              : Colors.white.withValues(alpha: 0.80),
+          borderRadius: BorderRadius.circular(999),
+          boxShadow: ListenerShadows.soft,
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: active ? Colors.white : ListenerColors.softText,
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -454,6 +551,25 @@ Future<void> _playSongs(WidgetRef ref, List<Song> songs) async {
     0,
     (songId) => repository.getStreamUrl(songId),
   );
+}
+
+List<String> _artistInitials(List<Artist> artists) {
+  final initials = artists.map((artist) => _artistInitial(artist.name)).toSet()
+    ..remove('');
+  final sorted = initials.toList()
+    ..sort((a, b) {
+      if (a == '#') return 1;
+      if (b == '#') return -1;
+      return a.compareTo(b);
+    });
+  return sorted;
+}
+
+String _artistInitial(String name) {
+  final trimmed = name.trim();
+  if (trimmed.isEmpty) return '';
+  final first = trimmed.characters.first.toUpperCase();
+  return RegExp(r'^[A-Z]$').hasMatch(first) ? first : '#';
 }
 
 class _ArtistsEmpty extends StatelessWidget {

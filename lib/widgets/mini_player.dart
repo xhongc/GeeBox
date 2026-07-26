@@ -21,9 +21,15 @@ class MiniPlayer extends ConsumerWidget {
     final subsonicService = ref.watch(subsonicServiceProvider);
     final repository = ref.watch(musicRepositoryProvider);
     final currentSong = ref.watch(currentSongProvider).value;
+    final position = ref.watch(positionProvider).value ?? Duration.zero;
+    final duration = ref.watch(durationProvider).value ?? Duration.zero;
+    final playbackError = ref.watch(playbackErrorProvider).valueOrNull;
 
     final isPlaying = playerState.value?.playing ?? false;
     final hasTrack = currentSong != null;
+    final progress = duration.inMilliseconds > 0
+        ? (position.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0)
+        : 0.0;
     final imageUrl = currentSong?.coverArt == null
         ? null
         : repository.getCoverArtUrl(currentSong!.coverArt!, size: 160);
@@ -40,7 +46,7 @@ class MiniPlayer extends ConsumerWidget {
             duration: const Duration(milliseconds: 120),
             child: Container(
               height: 76,
-              padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
               decoration: BoxDecoration(
                 gradient: ListenerGradients.darkPlayer,
                 borderRadius: BorderRadius.circular(26),
@@ -86,16 +92,21 @@ class MiniPlayer extends ConsumerWidget {
                       ],
                     ),
                   ),
-                  FButton.icon(
-                    size: FButtonSizeVariant.sm,
-                    variant: FButtonVariant.secondary,
+                  if (playbackError != null) ...[
+                    const SizedBox(width: 8),
+                    const Icon(
+                      FLucideIcons.triangleAlert,
+                      color: Color(0xFFF59E0B),
+                      size: 18,
+                    ),
+                  ],
+                  const SizedBox(width: 8),
+                  _ProgressPlayButton(
+                    progress: hasTrack ? progress : 0,
+                    isPlaying: isPlaying,
                     onPress: hasTrack
                         ? () => ref.read(audioPlayerServiceProvider).playPause()
                         : null,
-                    child: Icon(
-                      isPlaying ? FLucideIcons.pause : FLucideIcons.play,
-                      color: ListenerColors.foreground,
-                    ),
                   ),
                   const SizedBox(width: 4),
                   FButton.icon(
@@ -116,6 +127,62 @@ class MiniPlayer extends ConsumerWidget {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class _ProgressPlayButton extends StatelessWidget {
+  final double progress;
+  final bool isPlaying;
+  final VoidCallback? onPress;
+
+  const _ProgressPlayButton({
+    required this.progress,
+    required this.isPlaying,
+    required this.onPress,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onPress != null;
+
+    return SizedBox.square(
+      dimension: 42,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Positioned.fill(
+            child: CircularProgressIndicator(
+              value: progress,
+              strokeWidth: 2.4,
+              strokeCap: StrokeCap.round,
+              backgroundColor: Colors.white.withValues(alpha: 0.16),
+              valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+            ),
+          ),
+          Material(
+            color:
+                enabled ? Colors.white : Colors.white.withValues(alpha: 0.42),
+            shape: const CircleBorder(),
+            clipBehavior: Clip.antiAlias,
+            child: InkResponse(
+              onTap: onPress,
+              containedInkWell: true,
+              customBorder: const CircleBorder(),
+              child: SizedBox.square(
+                dimension: 34,
+                child: Icon(
+                  isPlaying ? FLucideIcons.pause : FLucideIcons.play,
+                  color: enabled
+                      ? ListenerColors.foreground
+                      : ListenerColors.foreground.withValues(alpha: 0.48),
+                  size: 18,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

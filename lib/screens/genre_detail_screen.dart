@@ -7,7 +7,6 @@ import 'package:forui/forui.dart';
 import '../models/song.dart';
 import '../providers/audio_player_provider.dart';
 import '../providers/music_repository_provider.dart';
-import '../widgets/forui_components.dart';
 import '../widgets/listener_components.dart';
 import '../widgets/listener_track_action_sheet.dart';
 
@@ -631,7 +630,6 @@ class _GenreTracks extends ConsumerWidget {
             song: song,
             imageUrl: imageUrl,
             onPress: () => _playSongs(ref, songs, initialIndex: index),
-            onFavorite: () => showChansonToast(context, '收藏功能将在喜爱页统一管理'),
             onMore: () => showListenerTrackActionSheet(
               context: context,
               ref: ref,
