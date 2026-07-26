@@ -213,6 +213,51 @@ class ListenerCoverArt extends StatelessWidget {
   }
 }
 
+class ListenerPlayingArtCard extends StatelessWidget {
+  final String? imageUrl;
+  final IconData fallbackIcon;
+  final double borderRadius;
+
+  const ListenerPlayingArtCard({
+    super.key,
+    required this.imageUrl,
+    this.fallbackIcon = FLucideIcons.music,
+    this.borderRadius = 30,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(32),
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Colors.white.withValues(alpha: 0.72),
+            Colors.white.withValues(alpha: 0.36),
+          ],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF6366F1).withValues(alpha: 0.18),
+            blurRadius: 70,
+            offset: const Offset(0, 28),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(13),
+        child: ListenerCoverArt(
+          imageUrl: imageUrl,
+          fallbackIcon: fallbackIcon,
+          borderRadius: borderRadius,
+        ),
+      ),
+    );
+  }
+}
+
 class ListenerSectionHeader extends StatelessWidget {
   final String title;
   final String? actionLabel;

@@ -197,53 +197,61 @@ class _AlbumsHeading extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 18),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: [
-            _SortPill(
-              label: '最近添加',
-              value: 'newest',
-              selected: selected,
-              onChanged: onChanged,
-            ),
-            _SortPill(
-              label: '最近播放',
-              value: 'recent',
-              selected: selected,
-              onChanged: onChanged,
-            ),
-            _SortPill(
-              label: '最多播放',
-              value: 'frequent',
-              selected: selected,
-              onChanged: onChanged,
-            ),
-            _SortPill(
-              label: 'A-Z排序',
-              value: 'alphabeticalByName',
-              selected: selected,
-              onChanged: onChanged,
-            ),
-            _SortPill(
-              label: '歌手排序',
-              value: 'alphabeticalByArtist',
-              selected: selected,
-              onChanged: onChanged,
-            ),
-            _SortPill(
-              label: '随机',
-              value: 'random',
-              selected: selected,
-              onChanged: onChanged,
-            ),
-            _SortPill(
-              label: '缺失封面',
-              value: 'less_cover',
-              selected: selected,
-              onChanged: onChanged,
-            ),
-          ],
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          clipBehavior: Clip.none,
+          child: Row(
+            children: [
+              _SortPill(
+                label: '最近添加',
+                value: 'newest',
+                selected: selected,
+                onChanged: onChanged,
+              ),
+              const SizedBox(width: 10),
+              _SortPill(
+                label: '最近播放',
+                value: 'recent',
+                selected: selected,
+                onChanged: onChanged,
+              ),
+              const SizedBox(width: 10),
+              _SortPill(
+                label: '最多播放',
+                value: 'frequent',
+                selected: selected,
+                onChanged: onChanged,
+              ),
+              const SizedBox(width: 10),
+              _SortPill(
+                label: 'A-Z排序',
+                value: 'alphabeticalByName',
+                selected: selected,
+                onChanged: onChanged,
+              ),
+              const SizedBox(width: 10),
+              _SortPill(
+                label: '歌手排序',
+                value: 'alphabeticalByArtist',
+                selected: selected,
+                onChanged: onChanged,
+              ),
+              const SizedBox(width: 10),
+              _SortPill(
+                label: '随机',
+                value: 'random',
+                selected: selected,
+                onChanged: onChanged,
+              ),
+              const SizedBox(width: 10),
+              _SortPill(
+                label: '缺失封面',
+                value: 'less_cover',
+                selected: selected,
+                onChanged: onChanged,
+              ),
+            ],
+          ),
         ),
       ],
     );

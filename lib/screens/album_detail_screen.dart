@@ -250,7 +250,7 @@ class _AlbumDetailHero extends StatelessWidget {
     final width = MediaQuery.sizeOf(context).width;
     final coverSize = width.clamp(0, 420) * 0.66;
     final resolvedCoverSize = coverSize.clamp(216.0, 252.0);
-    final discSize = resolvedCoverSize * 0.94;
+    final discSize = resolvedCoverSize * 0.78;
 
     return Column(
       children: [
@@ -260,7 +260,7 @@ class _AlbumDetailHero extends StatelessWidget {
             alignment: Alignment.center,
             children: [
               Transform.translate(
-                offset: Offset(resolvedCoverSize * 0.24, 0),
+                offset: Offset(resolvedCoverSize * 0.30, 0),
                 child: Container(
                   width: discSize,
                   height: discSize,
@@ -283,12 +283,10 @@ class _AlbumDetailHero extends StatelessWidget {
               ),
               Align(
                 alignment: Alignment.center,
-                child: Container(
+                child: SizedBox(
                   width: resolvedCoverSize,
                   height: resolvedCoverSize,
-                  decoration:
-                      BoxDecoration(boxShadow: ListenerShadows.elevated),
-                  child: ListenerCoverArt(
+                  child: ListenerPlayingArtCard(
                     imageUrl: coverUrl,
                     fallbackIcon: FLucideIcons.disc3,
                     borderRadius: 30,
