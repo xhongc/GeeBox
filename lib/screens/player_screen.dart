@@ -25,6 +25,8 @@ class PlayerScreen extends ConsumerStatefulWidget {
 
 class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   bool _showLyrics = false;
+  String? _favoriteOverrideSongId;
+  bool? _favoriteOverrideValue;
 
   @override
   void initState() {
@@ -98,6 +100,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     final progress = totalDuration.inMilliseconds > 0
         ? currentPosition.inMilliseconds / totalDuration.inMilliseconds
         : 0.0;
+    final providerIsStarred =
+        ref.watch(isSongStarredProvider(currentSong.id)).valueOrNull ?? false;
+    final isStarred = _favoriteOverrideSongId == currentSong.id
+        ? _favoriteOverrideValue ?? providerIsStarred
+        : providerIsStarred;
     final coverUrl = currentSong.coverArt == null
         ? null
         : repository.getCoverArtUrl(currentSong.coverArt!, size: 700);
@@ -122,10 +129,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                       _PlayingTopBar(
                         song: currentSong,
                         onBack: () => Navigator.pop(context),
-                        onFavorite: () => _toggleFavorite(context, currentSong),
                         onMore: () => _showPlayerOptionsSheet(
                           context,
                           ref,
+                          currentSong,
+                          isStarred,
+                          () => _toggleFavorite(context, ref, currentSong),
                           sleepTimer.remaining,
                         ),
                       ),
@@ -223,7 +232,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     context.go('/');
   }
 
-  Future<void> _toggleFavorite(BuildContext context, Song song) async {
+  Future<void> _toggleFavorite(
+    BuildContext context,
+    WidgetRef ref,
+    Song song,
+  ) async {
     final service = ref.read(favoriteServiceProvider);
     final isStarred = await ref.read(isSongStarredProvider(song.id).future);
     bool ok;
@@ -239,6 +252,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     if (ok) {
       ref.invalidate(starredSongsProvider);
       ref.invalidate(isSongStarredProvider(song.id));
+      setState(() {
+        _favoriteOverrideSongId = song.id;
+        _favoriteOverrideValue = !isStarred;
+      });
     }
   }
 }
@@ -246,6 +263,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 void _showPlayerOptionsSheet(
   BuildContext context,
   WidgetRef ref,
+  Song song,
+  bool isStarred,
+  Future<void> Function() onToggleFavorite,
   Duration? sleepRemaining,
 ) {
   showFSheet<void>(
@@ -283,19 +303,41 @@ void _showPlayerOptionsSheet(
                 ),
               ),
               const SizedBox(height: 14),
-              _PlayerOptionTile(
-                icon: FLucideIcons.timer,
-                title: '睡眠定时器',
-                subtitle: sleepRemaining == null
-                    ? '设置自动暂停播放'
-                    : '${sleepRemaining.inMinutes.clamp(1, 999)} 分钟后暂停',
-                onPress: () async {
-                  Navigator.pop(sheetContext);
-                  await Future<void>.delayed(const Duration(milliseconds: 120));
-                  if (context.mounted) {
-                    _showSleepTimerSheet(context, ref);
-                  }
-                },
+              Column(
+                children: [
+                  _PlayerOptionTile(
+                    icon:
+                        isStarred ? FLucideIcons.heartOff : FLucideIcons.heart,
+                    title: isStarred ? '取消收藏' : '收藏',
+                    subtitle: isStarred ? '从我喜欢的音乐中移除' : '加入我喜欢的音乐',
+                    onPress: () async {
+                      Navigator.pop(sheetContext);
+                      await Future<void>.delayed(
+                        const Duration(milliseconds: 120),
+                      );
+                      if (context.mounted) {
+                        await onToggleFavorite();
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  _PlayerOptionTile(
+                    icon: FLucideIcons.timer,
+                    title: '睡眠定时器',
+                    subtitle: sleepRemaining == null
+                        ? '设置自动暂停播放'
+                        : '${sleepRemaining.inMinutes.clamp(1, 999)} 分钟后暂停',
+                    onPress: () async {
+                      Navigator.pop(sheetContext);
+                      await Future<void>.delayed(
+                        const Duration(milliseconds: 120),
+                      );
+                      if (context.mounted) {
+                        _showSleepTimerSheet(context, ref);
+                      }
+                    },
+                  ),
+                ],
               ),
             ],
           ),
@@ -512,13 +554,11 @@ class _PlaybackErrorBanner extends StatelessWidget {
 class _PlayingTopBar extends StatelessWidget {
   final Song song;
   final VoidCallback onBack;
-  final VoidCallback onFavorite;
   final VoidCallback onMore;
 
   const _PlayingTopBar({
     required this.song,
     required this.onBack,
-    required this.onFavorite,
     required this.onMore,
   });
 
@@ -553,8 +593,6 @@ class _PlayingTopBar extends StatelessWidget {
             ],
           ),
         ),
-        ListenerCircleButton(icon: FLucideIcons.heart, onPress: onFavorite),
-        const SizedBox(width: 8),
         ListenerCircleButton(
           icon: FLucideIcons.ellipsis,
           tooltip: '更多',
@@ -901,28 +939,50 @@ class _PlaybackControls extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-        _RoundControl(
-          icon: FLucideIcons.shuffle,
-          active: playMode == PlayMode.shuffle,
-          onPress: onShuffle,
+        Expanded(
+          child: Align(
+            alignment: Alignment.center,
+            child: Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 10,
+              children: [
+                _RoundControl(
+                  icon: FLucideIcons.shuffle,
+                  active: playMode == PlayMode.shuffle,
+                  onPress: onShuffle,
+                ),
+                _RoundControl(
+                  icon: playMode == PlayMode.repeatOne
+                      ? FLucideIcons.repeat1
+                      : FLucideIcons.repeat,
+                  active: playMode == PlayMode.repeatOne,
+                  onPress: onRepeat,
+                ),
+                _RoundControl(icon: FLucideIcons.skipBack, onPress: onPrevious),
+              ],
+            ),
+          ),
         ),
-        _RoundControl(
-          icon: playMode == PlayMode.repeatOne
-              ? FLucideIcons.repeat1
-              : FLucideIcons.repeat,
-          active: playMode == PlayMode.repeatOne,
-          onPress: onRepeat,
-        ),
-        _RoundControl(icon: FLucideIcons.skipBack, onPress: onPrevious),
-        FButton.icon(
-          size: FButtonSizeVariant.lg,
+        const SizedBox(width: 14),
+        _PlayPauseButton(
+          isPlaying: isPlaying,
           onPress: onPlayPause,
-          child: Icon(isPlaying ? FLucideIcons.pause : FLucideIcons.play),
         ),
-        _RoundControl(icon: FLucideIcons.skipForward, onPress: onNext),
-        _RoundControl(icon: FLucideIcons.listMusic, onPress: onQueue),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Align(
+            alignment: Alignment.center,
+            child: Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 10,
+              children: [
+                _RoundControl(icon: FLucideIcons.skipForward, onPress: onNext),
+                _RoundControl(icon: FLucideIcons.listMusic, onPress: onQueue),
+              ],
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -941,13 +1001,55 @@ class _RoundControl extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FButton.icon(
-      variant: FButtonVariant.ghost,
+    return ListenerCircleButton(
+      icon: icon,
       onPress: onPress,
-      child: Icon(
-        icon,
-        color: active ? ListenerColors.foreground : ListenerColors.softText,
-      ),
+      iconColor: active ? ListenerColors.foreground : ListenerColors.softText,
+    );
+  }
+}
+
+class _PlayPauseButton extends StatelessWidget {
+  final bool isPlaying;
+  final VoidCallback onPress;
+
+  const _PlayPauseButton({
+    required this.isPlaying,
+    required this.onPress,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return FTappable(
+      onPress: onPress,
+      builder: (context, states, child) {
+        final pressed = states.contains(FTappableVariant.pressed);
+
+        return AnimatedScale(
+          scale: pressed ? 0.97 : 1,
+          duration: const Duration(milliseconds: 120),
+          child: Container(
+            width: 68,
+            height: 68,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: ListenerColors.foreground,
+              boxShadow: ListenerShadows.elevated,
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.16),
+                width: 1,
+              ),
+            ),
+            child: Center(
+              child: Icon(
+                isPlaying ? FLucideIcons.pause : FLucideIcons.play,
+                color: Colors.white,
+                size: 26,
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

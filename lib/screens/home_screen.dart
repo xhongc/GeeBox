@@ -13,7 +13,6 @@ import '../providers/play_history_provider.dart';
 import '../providers/subsonic_provider.dart';
 import '../widgets/listener_components.dart';
 import '../widgets/listener_track_action_sheet.dart';
-import 'settings_screen.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -34,13 +33,6 @@ class HomeScreen extends ConsumerWidget {
             delegate: SliverChildListDelegate.fixed([
               _HomeHeading(
                 onSearch: () => context.push('/search'),
-                onAccount: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const SettingsScreen(),
-                    ),
-                  );
-                },
               ),
               const SizedBox(height: 16),
               homeAsync.when(
@@ -170,9 +162,8 @@ class HomeScreen extends ConsumerWidget {
 
 class _HomeHeading extends StatelessWidget {
   final VoidCallback onSearch;
-  final VoidCallback onAccount;
 
-  const _HomeHeading({required this.onSearch, required this.onAccount});
+  const _HomeHeading({required this.onSearch});
 
   @override
   Widget build(BuildContext context) {
@@ -209,11 +200,6 @@ class _HomeHeading extends StatelessWidget {
         ListenerCircleButton(
           icon: FLucideIcons.search,
           onPress: onSearch,
-        ),
-        const SizedBox(width: 9),
-        ListenerCircleButton(
-          icon: FLucideIcons.userRound,
-          onPress: onAccount,
         ),
       ],
     );

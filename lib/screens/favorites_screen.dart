@@ -14,6 +14,7 @@ import '../providers/subsonic_provider.dart';
 import '../widgets/forui_components.dart';
 import '../widgets/listener_components.dart';
 import '../widgets/listener_track_action_sheet.dart';
+import 'settings_screen.dart';
 
 /// Listener 风格喜爱页面
 class FavoritesScreen extends ConsumerStatefulWidget {
@@ -40,6 +41,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                 data: (items) => _FavoritesHero(
                   tab: _tab,
                   count: _countForTab(items, _tab),
+                  onAccount: _openSettings,
                   onTab: (tab) {
                     setState(() {
                       _tab = tab;
@@ -55,6 +57,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                 loading: () => _FavoritesHero(
                   tab: _tab,
                   count: 0,
+                  onAccount: _openSettings,
                   onTab: (tab) {
                     setState(() {
                       _tab = tab;
@@ -64,6 +67,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                 error: (_, __) => _FavoritesHero(
                   tab: _tab,
                   count: 0,
+                  onAccount: _openSettings,
                   onTab: (tab) {
                     setState(() {
                       _tab = tab;
@@ -109,11 +113,20 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
       _ => items.songs.length,
     };
   }
+
+  void _openSettings() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const SettingsScreen(),
+      ),
+    );
+  }
 }
 
 class _FavoritesHero extends StatelessWidget {
   final String tab;
   final int count;
+  final VoidCallback onAccount;
   final ValueChanged<String> onTab;
   final VoidCallback? onPlay;
   final VoidCallback? onShuffle;
@@ -121,6 +134,7 @@ class _FavoritesHero extends StatelessWidget {
   const _FavoritesHero({
     required this.tab,
     required this.count,
+    required this.onAccount,
     required this.onTab,
     this.onPlay,
     this.onShuffle,
@@ -177,23 +191,9 @@ class _FavoritesHero extends StatelessWidget {
                 ],
               ),
             ),
-            Container(
-              width: 48,
-              height: 48,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: ListenerColors.foreground,
-                shape: BoxShape.circle,
-                boxShadow: ListenerShadows.soft,
-              ),
-              child: Text(
-                '$count',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
+            ListenerCircleButton(
+              icon: FLucideIcons.userRound,
+              onPress: onAccount,
             ),
           ],
         ),

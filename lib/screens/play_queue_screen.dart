@@ -73,6 +73,7 @@ class PlayQueueScreen extends ConsumerWidget {
                 )
               else
                 ReorderableListView.builder(
+                  buildDefaultDragHandles: false,
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   proxyDecorator: (child, index, animation) => Material(
