@@ -62,8 +62,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                   child: Row(
                     children: [
                       ListenerCircleButton(
-                        icon: FLucideIcons.chevronLeft,
-                        onPress: () => Navigator.pop(context),
+                        icon: FLucideIcons.chevronDown,
+                        tooltip: '播放队列',
+                        onPress: () => _openQueueTab(context),
                       ),
                     ],
                   ),
@@ -128,7 +129,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                     children: [
                       _PlayingTopBar(
                         song: currentSong,
-                        onBack: () => Navigator.pop(context),
+                        onQueue: () => _openQueueTab(context),
                         onMore: () => _showPlayerOptionsSheet(
                           context,
                           ref,
@@ -553,12 +554,12 @@ class _PlaybackErrorBanner extends StatelessWidget {
 
 class _PlayingTopBar extends StatelessWidget {
   final Song song;
-  final VoidCallback onBack;
+  final VoidCallback onQueue;
   final VoidCallback onMore;
 
   const _PlayingTopBar({
     required this.song,
-    required this.onBack,
+    required this.onQueue,
     required this.onMore,
   });
 
@@ -566,7 +567,11 @@ class _PlayingTopBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        ListenerCircleButton(icon: FLucideIcons.chevronLeft, onPress: onBack),
+        ListenerCircleButton(
+          icon: FLucideIcons.chevronDown,
+          tooltip: '播放队列',
+          onPress: onQueue,
+        ),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
@@ -959,7 +964,6 @@ class _PlaybackControls extends StatelessWidget {
                   active: playMode == PlayMode.repeatOne,
                   onPress: onRepeat,
                 ),
-                _RoundControl(icon: FLucideIcons.skipBack, onPress: onPrevious),
               ],
             ),
           ),
@@ -977,8 +981,8 @@ class _PlaybackControls extends StatelessWidget {
               alignment: WrapAlignment.center,
               spacing: 10,
               children: [
+                _RoundControl(icon: FLucideIcons.skipBack, onPress: onPrevious),
                 _RoundControl(icon: FLucideIcons.skipForward, onPress: onNext),
-                _RoundControl(icon: FLucideIcons.listMusic, onPress: onQueue),
               ],
             ),
           ),
