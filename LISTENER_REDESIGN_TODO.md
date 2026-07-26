@@ -380,8 +380,12 @@
   - Web Chrome，如仍需支持
   - 关键截图必须覆盖：首页、专辑详情、艺术家详情、歌曲库、播放列表详情、播放页、队列页、搜索页、账号页、GroupCast。
   - 截图检查项：首屏信息密度、底部 dock/mini player 遮挡、长标题换行、按钮文字溢出、封面缺失 fallback、空状态是否仍是 Listener 浅色体系。
+  - 进展：`test/widget_test.dart` 已新增 `validates Listener key pages at mobile and desktop sizes`，在 `390x844` 手机尺寸和 `1024x768` 桌面尺寸下覆盖首页、专辑详情、艺术家详情、歌曲库、播放列表详情、播放页、队列页、搜索页、账号页、GroupCast，并断言无布局异常/overflow 异常。
+  - 进展：尝试在 Flutter test 中用 `RepaintBoundary.toImage` 生成关键页面 PNG 到 `build/listener_ui_screenshots/`；`mobile_home.png` 可生成，但详情页截图编码在当前 test shell 中长时间不返回，已移除不稳定截图测试以保持验证套件可靠。
   - 备注：`flutter build macos --debug` 已尝试，但当前环境缺少 `xcodebuild`，无法完成 macOS 构建验证；命令已触发 Flutter macOS 工程兼容迁移。
-  - 备注：`flutter build web --debug` 已尝试，但当前项目未配置 web 平台目录。
+  - 备注：再次验证 macOS 构建时，`which xcodebuild` 可见 `/usr/bin/xcodebuild`，但 `xcrun` 仍报 `unable to find utility "xcodebuild", not a developer tool or in PATH`，当前机器 Xcode developer tools 配置仍阻塞原生 macOS 构建。
+  - 备注：已用 `flutter create --platforms web .` 恢复 Web 平台目录，并运行 `flutter build web --debug` 成功生成 `build/web`，Chrome/Web 构建验证通过。
+  - 备注：`flutter devices` 当前仅发现 macOS 和 Chrome；无 iPhone/Android 真机或模拟器，因此 iPhone/Android 常见尺寸目前由 widget viewport 测试覆盖，未取得真实设备截图。
 - [x] 删除确认：
   - `rg` 检查被删除页面无引用
   - 路由表无死路由

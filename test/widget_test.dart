@@ -320,7 +320,6 @@ void main() {
           albumId: 'album-1',
           albumName: 'Aurora Archive',
           albumArtist: 'Nova',
-          coverArtId: 'cover-album-1',
         ),
         audioOverrides,
       ),
@@ -329,7 +328,6 @@ void main() {
         const ArtistDetailScreen(
           artistId: 'artist-1',
           artistName: 'Nova',
-          coverArtId: 'cover-artist-1',
         ),
         audioOverrides,
       ),
