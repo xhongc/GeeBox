@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:forui/forui.dart';
-import '../providers/playlist_provider.dart';
-import '../providers/audio_player_provider.dart';
-import '../providers/subsonic_provider.dart';
-import '../providers/music_repository_provider.dart';
+
+import '../models/playlist.dart';
 import '../models/song.dart';
-import '../widgets/error_view.dart';
+import '../providers/audio_player_provider.dart';
+import '../providers/music_repository_provider.dart';
+import '../providers/playlist_provider.dart';
 import '../widgets/forui_components.dart';
+import '../widgets/listener_components.dart';
+import '../widgets/listener_track_action_sheet.dart';
 
 class PlaylistDetailScreen extends ConsumerWidget {
   final String playlistId;
@@ -22,227 +24,57 @@ class PlaylistDetailScreen extends ConsumerWidget {
     final playlistAsync = ref.watch(playlistProvider(playlistId));
     final songsAsync = ref.watch(playlistSongsProvider(playlistId));
 
-    return playlistAsync.when(
-      data: (playlist) {
-        if (playlist == null) {
-          return const ChansonScaffold(
-            title: '播放列表',
-            child: ChansonEmptyState(
-              icon: FLucideIcons.listX,
-              message: '播放列表不存在',
-            ),
-          );
-        }
+    return FScaffold(
+      childPad: false,
+      child: DecoratedBox(
+        decoration: const BoxDecoration(gradient: ListenerGradients.shell),
+        child: SafeArea(
+          bottom: false,
+          child: playlistAsync.when(
+            data: (playlist) {
+              if (playlist == null) {
+                return const Center(
+                  child: Text(
+                    '播放列表不存在',
+                    style: TextStyle(color: ListenerColors.muted),
+                  ),
+                );
+              }
 
-        return ChansonScaffold(
-          title: playlist.name,
-          suffixes: [
-            FHeaderAction(
-              icon: const Icon(FLucideIcons.ellipsisVertical),
-              onPress: () => _showPlaylistOptions(context, ref, playlist),
-            ),
-          ],
-          child: songsAsync.when(
-            data: (songs) => _buildSongList(context, ref, playlist, songs),
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (error, stack) => error.toErrorWidget(
-              onRetry: () => ref.invalidate(playlistSongsProvider(playlistId)),
-            ),
-          ),
-        );
-      },
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, stack) => error.toErrorWidget(
-        onRetry: () => ref.invalidate(playlistProvider(playlistId)),
-      ),
-    );
-  }
-
-  Widget _buildSongList(
-    BuildContext context,
-    WidgetRef ref,
-    playlist,
-    List<Song> songs,
-  ) {
-    final theme = context.theme;
-
-    if (songs.isEmpty) {
-      return ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-        children: [
-          _PlaylistHero(playlist: playlist),
-          const SizedBox(height: 48),
-          const SizedBox(
-            height: 220,
-            child: ChansonEmptyState(
-              icon: FLucideIcons.music,
-              message: '播放列表为空',
-            ),
-          ),
-        ],
-      );
-    }
-
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 160),
-      children: [
-        _PlaylistHero(playlist: playlist),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
+              return songsAsync.when(
+                data: (songs) => _PlaylistDetailBody(
+                  playlist: playlist,
+                  songs: songs,
+                  onBack: () => Navigator.of(context).pop(),
+                  onEdit: () => _showEditDialog(context, ref, playlist),
+                  onDelete: () => _showDeleteDialog(context, ref, playlist),
+                ),
+                loading: () => const Center(child: FCircularProgress()),
+                error: (_, __) => Center(
+                  child: FButton(
+                    variant: FButtonVariant.ghost,
+                    onPress: () =>
+                        ref.invalidate(playlistSongsProvider(playlistId)),
+                    child: const Text('重新加载歌曲'),
+                  ),
+                ),
+              );
+            },
+            loading: () => const Center(child: FCircularProgress()),
+            error: (_, __) => Center(
               child: FButton(
-                onPress: () => _playAll(context, ref, songs),
-                prefix: const Icon(FLucideIcons.play),
-                child: Text('播放全部 (${songs.length})'),
+                variant: FButtonVariant.ghost,
+                onPress: () => ref.invalidate(playlistProvider(playlistId)),
+                child: const Text('重新加载播放列表'),
               ),
             ),
-            const SizedBox(width: 8),
-            FButton(
-              variant: FButtonVariant.outline,
-              onPress: () => _shufflePlay(context, ref, songs),
-              prefix: const Icon(FLucideIcons.shuffle),
-              child: const Text('随机播放'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 18),
-        ChansonSection(
-          title: '歌曲',
-          children: [
-            for (final (index, song) in songs.indexed)
-              _buildSongItem(context, ref, song, index),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Text(
-          '共 ${songs.length} 首歌曲',
-          style: theme.typography.body.xs.copyWith(
-            color: theme.colors.mutedForeground,
           ),
         ),
-      ],
-    );
-  }
-
-  Widget _buildSongItem(
-      BuildContext context, WidgetRef ref, Song song, int index) {
-    final repository = ref.read(musicRepositoryProvider);
-
-    return ChansonSongTile(
-      coverUrl: song.coverArt == null
-          ? null
-          : repository.getCoverArtUrl(song.coverArt!),
-      title: song.title,
-      subtitle: song.artist ?? '未知艺术家',
-      duration: _formatDuration(song.duration ?? 0),
-      onMore: () => _showSongOptions(context, ref, song),
-      onPress: () => _playSong(context, ref, song),
-    );
-  }
-
-  void _playAll(BuildContext context, WidgetRef ref, List<Song> songs) {
-    if (songs.isEmpty) return;
-
-    final audioService = ref.read(audioPlayerServiceProvider);
-    final subsonicService = ref.read(subsonicServiceProvider);
-
-    audioService.setPlaylist(songs, initialIndex: 0);
-    final streamUrl = subsonicService.getStreamUrl(songs[0].id);
-    audioService.playSong(songs[0], streamUrl);
-
-    showChansonToast(context, '开始播放 ${songs.length} 首歌曲');
-  }
-
-  void _shufflePlay(BuildContext context, WidgetRef ref, List<Song> songs) {
-    if (songs.isEmpty) return;
-
-    final shuffledSongs = List<Song>.from(songs)..shuffle();
-    final audioService = ref.read(audioPlayerServiceProvider);
-    final subsonicService = ref.read(subsonicServiceProvider);
-
-    audioService.setPlaylist(shuffledSongs, initialIndex: 0);
-    final streamUrl = subsonicService.getStreamUrl(shuffledSongs[0].id);
-    audioService.playSong(shuffledSongs[0], streamUrl);
-
-    showChansonToast(context, '随机播放模式');
-  }
-
-  void _playSong(BuildContext context, WidgetRef ref, Song song) {
-    final audioService = ref.read(audioPlayerServiceProvider);
-    final subsonicService = ref.read(subsonicServiceProvider);
-    final streamUrl = subsonicService.getStreamUrl(song.id);
-
-    audioService.playSong(song, streamUrl);
-  }
-
-  void _showPlaylistOptions(BuildContext context, WidgetRef ref, playlist) {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            FTile(
-              prefix: const Icon(FLucideIcons.penLine),
-              title: const Text('编辑信息'),
-              onPress: () {
-                Navigator.pop(context);
-                _showEditDialog(context, ref, playlist);
-              },
-            ),
-            FTile(
-              variant: FItemVariant.destructive,
-              prefix: const Icon(FLucideIcons.trash2),
-              title: const Text('删除播放列表'),
-              onPress: () {
-                Navigator.pop(context);
-                _showDeleteDialog(context, ref, playlist);
-              },
-            ),
-          ],
-        ),
       ),
     );
   }
 
-  void _showSongOptions(BuildContext context, WidgetRef ref, Song song) {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            FTile(
-              prefix: const Icon(FLucideIcons.play),
-              title: const Text('播放'),
-              onPress: () {
-                Navigator.pop(context);
-                _playSong(context, ref, song);
-              },
-            ),
-            FTile(
-              variant: FItemVariant.destructive,
-              prefix: const Icon(FLucideIcons.circleMinus),
-              title: const Text('从播放列表移除'),
-              onPress: () async {
-                Navigator.pop(context);
-                final service = ref.read(playlistServiceProvider);
-                await service.removeSongFromPlaylist(playlistId, song.id);
-                refreshPlaylist(ref, playlistId);
-
-                if (context.mounted) {
-                  showChansonToast(context, '已移除: ${song.title}');
-                }
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showEditDialog(BuildContext context, WidgetRef ref, playlist) {
+  void _showEditDialog(BuildContext context, WidgetRef ref, Playlist playlist) {
     final nameController = TextEditingController(text: playlist.name);
     final descriptionController =
         TextEditingController(text: playlist.description ?? '');
@@ -285,23 +117,20 @@ class PlaylistDetailScreen extends ConsumerWidget {
                     onPress: () async {
                       final name = nameController.text.trim();
                       if (name.isEmpty) return;
-
                       final service = ref.read(playlistServiceProvider);
-                      final updatedPlaylist = playlist.copyWith(
-                        name: name,
-                        description: descriptionController.text.trim().isEmpty
-                            ? null
-                            : descriptionController.text.trim(),
+                      await service.updatePlaylist(
+                        playlist.copyWith(
+                          name: name,
+                          description: descriptionController.text.trim().isEmpty
+                              ? null
+                              : descriptionController.text.trim(),
+                        ),
                       );
-                      await service.updatePlaylist(updatedPlaylist);
-
                       refreshPlaylist(ref, playlistId);
                       refreshPlaylists(ref);
-
-                      if (context.mounted) {
-                        showChansonToast(context, '已更新播放列表');
-                        Navigator.pop(context);
-                      }
+                      if (!context.mounted) return;
+                      showChansonToast(context, '已更新播放列表');
+                      Navigator.pop(context);
                     },
                     child: const Text('保存'),
                   ),
@@ -314,7 +143,8 @@ class PlaylistDetailScreen extends ConsumerWidget {
     );
   }
 
-  void _showDeleteDialog(BuildContext context, WidgetRef ref, playlist) {
+  void _showDeleteDialog(
+      BuildContext context, WidgetRef ref, Playlist playlist) {
     showFDialog(
       context: context,
       builder: (context, style, animation) => FDialog(
@@ -341,16 +171,14 @@ class PlaylistDetailScreen extends ConsumerWidget {
                   FButton(
                     variant: FButtonVariant.destructive,
                     onPress: () async {
-                      final service = ref.read(playlistServiceProvider);
-                      await service.deletePlaylist(playlistId);
-
+                      await ref
+                          .read(playlistServiceProvider)
+                          .deletePlaylist(playlistId);
                       refreshPlaylists(ref);
-
-                      if (context.mounted) {
-                        showChansonToast(context, '已删除: ${playlist.name}');
-                        Navigator.pop(context);
-                        Navigator.pop(context);
-                      }
+                      if (!context.mounted) return;
+                      showChansonToast(context, '已删除: ${playlist.name}');
+                      Navigator.pop(context);
+                      Navigator.pop(context);
                     },
                     child: const Text('删除'),
                   ),
@@ -362,74 +190,384 @@ class PlaylistDetailScreen extends ConsumerWidget {
       ),
     );
   }
+}
 
-  String _formatDuration(int seconds) {
-    final minutes = seconds ~/ 60;
-    final remainingSeconds = seconds % 60;
-    return '$minutes:${remainingSeconds.toString().padLeft(2, '0')}';
+class _PlaylistDetailBody extends ConsumerWidget {
+  final Playlist playlist;
+  final List<Song> songs;
+  final VoidCallback onBack;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  const _PlaylistDetailBody({
+    required this.playlist,
+    required this.songs,
+    required this.onBack,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final total = songs.fold<int>(0, (sum, song) => sum + (song.duration ?? 0));
+
+    return Stack(
+      children: [
+        Positioned(
+          top: -56,
+          left: -32,
+          right: -32,
+          height: 260,
+          child: Opacity(
+            opacity: 0.14,
+            child: ListenerCoverArt(
+              imageUrl: playlist.coverUrl,
+              fallbackIcon: FLucideIcons.listMusic,
+              borderRadius: 0,
+            ),
+          ),
+        ),
+        Positioned.fill(
+          child: CustomScrollView(
+            slivers: [
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 32),
+                sliver: SliverList(
+                  delegate: SliverChildListDelegate([
+                    _PlaylistTopBar(
+                      playlist: playlist,
+                      onBack: onBack,
+                      onEdit: onEdit,
+                      onDelete: onDelete,
+                    ),
+                    const SizedBox(height: 22),
+                    _PlaylistHero(
+                      playlist: playlist,
+                      trackCount: songs.length,
+                      totalDuration: total,
+                    ),
+                    const SizedBox(height: 20),
+                    _PlaylistActions(
+                      hasSongs: songs.isNotEmpty,
+                      onPlay: () => _playSongs(ref, songs),
+                      onShuffle: () => _shuffleSongs(ref, songs),
+                      onNext: () {
+                        _addSongsNext(ref, songs);
+                        showChansonToast(context, '已添加到下一首');
+                      },
+                      onQueue: () {
+                        ref
+                            .read(audioPlayerServiceProvider)
+                            .addAllToQueue(songs);
+                        showChansonToast(context, '已加入队列');
+                      },
+                    ),
+                    const SizedBox(height: 26),
+                    ListenerSectionHeader(
+                      title: '${songs.length} 首歌曲',
+                    ),
+                    if (songs.isEmpty)
+                      const SizedBox(
+                        height: 180,
+                        child: Center(
+                          child: Text(
+                            '播放列表为空',
+                            style: TextStyle(color: ListenerColors.muted),
+                          ),
+                        ),
+                      )
+                    else
+                      for (final (index, song) in songs.indexed)
+                        Builder(
+                          builder: (context) {
+                            final imageUrl = _coverUrl(ref, song);
+                            return ListenerTrackRow(
+                              song: song,
+                              imageUrl: imageUrl,
+                              onPress: () => _playSongs(
+                                ref,
+                                songs,
+                                initialIndex: index,
+                              ),
+                              onFavorite: () => _removeSong(context, ref, song),
+                              onMore: () => showListenerTrackActionSheet(
+                                context: context,
+                                ref: ref,
+                                song: song,
+                                imageUrl: imageUrl,
+                                queue: songs,
+                                index: index,
+                              ),
+                            );
+                          },
+                        ),
+                    const SizedBox(height: 28),
+                  ]),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _removeSong(
+    BuildContext context,
+    WidgetRef ref,
+    Song song,
+  ) async {
+    await ref
+        .read(playlistServiceProvider)
+        .removeSongFromPlaylist(playlist.id, song.id);
+    refreshPlaylist(ref, playlist.id);
+    if (!context.mounted) return;
+    showChansonToast(context, '已移除: ${song.title}');
+  }
+}
+
+class _PlaylistTopBar extends StatelessWidget {
+  final Playlist playlist;
+  final VoidCallback onBack;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  const _PlaylistTopBar({
+    required this.playlist,
+    required this.onBack,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        ListenerCircleButton(icon: FLucideIcons.chevronLeft, onPress: onBack),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            children: [
+              const Text(
+                '播放列表详情',
+                style: TextStyle(
+                  color: ListenerColors.foreground,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                playlist.description?.isNotEmpty == true
+                    ? playlist.description!
+                    : '我的歌单',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: ListenerColors.muted,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+        ListenerCircleButton(icon: FLucideIcons.penLine, onPress: onEdit),
+        const SizedBox(width: 8),
+        ListenerCircleButton(icon: FLucideIcons.trash2, onPress: onDelete),
+      ],
+    );
   }
 }
 
 class _PlaylistHero extends StatelessWidget {
-  final dynamic playlist;
+  final Playlist playlist;
+  final int trackCount;
+  final int totalDuration;
 
-  const _PlaylistHero({required this.playlist});
+  const _PlaylistHero({
+    required this.playlist,
+    required this.trackCount,
+    required this.totalDuration,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final theme = context.theme;
-
-    return FCard(
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Row(
-          children: [
-            const SizedBox.square(
-              dimension: 92,
-              child: ChansonCoverArt(
-                fallbackIcon: FLucideIcons.listMusic,
-                borderRadius: 8,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    playlist.name,
-                    style: theme.typography.body.xl.copyWith(
-                      color: theme.colors.foreground,
-                      fontWeight: FontWeight.w800,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+    return Column(
+      children: [
+        SizedBox(
+          height: 240,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Positioned(
+                right: 34,
+                child: Container(
+                  width: 178,
+                  height: 178,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: ListenerColors.foreground,
+                    boxShadow: ListenerShadows.elevated,
                   ),
-                  if (playlist.description != null &&
-                      playlist.description!.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      playlist.description!,
-                      style: theme.typography.body.sm.copyWith(
-                        color: theme.colors.mutedForeground,
+                  child: Center(
+                    child: Container(
+                      width: 56,
+                      height: 56,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Color(0xFFF7F6F3),
                       ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                  const SizedBox(height: 8),
-                  Text(
-                    '${playlist.songIds.length} 首歌曲',
-                    style: theme.typography.body.xs.copyWith(
-                      color: theme.colors.mutedForeground,
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
-          ],
+              Positioned(
+                left: 24,
+                child: Container(
+                  width: 188,
+                  height: 188,
+                  decoration:
+                      BoxDecoration(boxShadow: ListenerShadows.elevated),
+                  child: ListenerCoverArt(
+                    imageUrl: playlist.coverUrl,
+                    fallbackIcon: FLucideIcons.listMusic,
+                    borderRadius: 28,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
+        const SizedBox(height: 4),
+        const Text(
+          'Playlist',
+          style: TextStyle(
+            color: ListenerColors.muted,
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.6,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          playlist.name,
+          textAlign: TextAlign.center,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: ListenerColors.foreground,
+            fontSize: 30,
+            height: 1.05,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        if (playlist.description?.isNotEmpty == true) ...[
+          const SizedBox(height: 10),
+          Text(
+            playlist.description!,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: ListenerColors.softText,
+              fontSize: 13,
+            ),
+          ),
+        ],
+        const SizedBox(height: 14),
+        Text(
+          '$trackCount 首歌曲 · ${formatSongDuration(totalDuration)}',
+          style: const TextStyle(
+            color: ListenerColors.muted,
+            fontSize: 12,
+          ),
+        ),
+      ],
     );
+  }
+}
+
+class _PlaylistActions extends StatelessWidget {
+  final bool hasSongs;
+  final VoidCallback onPlay;
+  final VoidCallback onShuffle;
+  final VoidCallback onNext;
+  final VoidCallback onQueue;
+
+  const _PlaylistActions({
+    required this.hasSongs,
+    required this.onPlay,
+    required this.onShuffle,
+    required this.onNext,
+    required this.onQueue,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          flex: 2,
+          child: FButton(
+            onPress: hasSongs ? onPlay : null,
+            prefix: const Icon(FLucideIcons.play),
+            child: const Text('播放'),
+          ),
+        ),
+        const SizedBox(width: 10),
+        FButton(
+          variant: FButtonVariant.secondary,
+          onPress: hasSongs ? onShuffle : null,
+          prefix: const Icon(FLucideIcons.shuffle),
+          child: const Text('随机'),
+        ),
+        const SizedBox(width: 10),
+        FButton(
+          variant: FButtonVariant.secondary,
+          onPress: hasSongs ? onNext : null,
+          prefix: const Icon(FLucideIcons.listEnd),
+          child: const Text('下一首'),
+        ),
+        const SizedBox(width: 10),
+        FButton(
+          variant: FButtonVariant.secondary,
+          onPress: hasSongs ? onQueue : null,
+          prefix: const Icon(FLucideIcons.listPlus),
+          child: const Text('队列'),
+        ),
+      ],
+    );
+  }
+}
+
+String? _coverUrl(WidgetRef ref, Song song) {
+  if (song.coverArt == null) return null;
+  return ref.read(musicRepositoryProvider).getCoverArtUrl(song.coverArt!);
+}
+
+Future<void> _playSongs(
+  WidgetRef ref,
+  List<Song> songs, {
+  int initialIndex = 0,
+}) async {
+  if (songs.isEmpty) return;
+  final player = ref.read(audioPlayerServiceProvider);
+  final repository = ref.read(musicRepositoryProvider);
+  await player.setPlaylist(songs, initialIndex: initialIndex);
+  await player.playAtIndex(
+    initialIndex,
+    (songId) => repository.getStreamUrl(songId),
+  );
+}
+
+Future<void> _shuffleSongs(WidgetRef ref, List<Song> songs) async {
+  final shuffled = List<Song>.from(songs)..shuffle();
+  await _playSongs(ref, shuffled);
+}
+
+void _addSongsNext(WidgetRef ref, List<Song> songs) {
+  final player = ref.read(audioPlayerServiceProvider);
+  for (final song in songs.reversed) {
+    player.addNext(song);
   }
 }

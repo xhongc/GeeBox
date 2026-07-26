@@ -2,15 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
-import 'dart:ui';
+
+import '../models/song.dart';
 import '../providers/audio_player_provider.dart';
-import '../providers/subsonic_provider.dart';
-import '../providers/music_repository_provider.dart';
 import '../providers/favorite_provider.dart';
+import '../providers/music_repository_provider.dart';
 import '../providers/play_history_provider.dart';
-import '../providers/sleep_timer_provider.dart';
+import '../providers/subsonic_provider.dart';
 import '../services/audio_player_service.dart';
 import '../widgets/forui_components.dart';
+import '../widgets/listener_components.dart';
 import '../widgets/lyrics_widget.dart';
 
 class PlayerScreen extends ConsumerStatefulWidget {
@@ -21,20 +22,18 @@ class PlayerScreen extends ConsumerStatefulWidget {
 }
 
 class _PlayerScreenState extends ConsumerState<PlayerScreen> {
+  bool _showLyrics = false;
+
   @override
   void initState() {
     super.initState();
-    // 设置 scrobble 回调
     final audioService = ref.read(audioPlayerServiceProvider);
     final playHistoryService = ref.read(playHistoryServiceProvider);
-    audioService.setScrobbleCallback((songId) {
-      playHistoryService.scrobble(songId);
-    });
+    audioService.setScrobbleCallback(playHistoryService.scrobble);
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = context.theme;
     final audioService = ref.watch(audioPlayerServiceProvider);
     final playerState = ref.watch(playerStateProvider);
     final position = ref.watch(positionProvider);
@@ -42,15 +41,49 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     final subsonicService = ref.watch(subsonicServiceProvider);
     final repository = ref.watch(musicRepositoryProvider);
     final currentSong = ref.watch(currentSongProvider).value;
+    final playMode = ref.watch(playModeProvider).value ?? PlayMode.sequence;
 
-    // 如果没有歌曲，返回空页面
     if (currentSong == null) {
-      return ChansonScaffold(
-        title: '正在播放',
-        onBack: () => Navigator.pop(context),
-        child: const ChansonEmptyState(
-          icon: FLucideIcons.music,
-          message: '暂无播放内容',
+      return FScaffold(
+        childPad: false,
+        child: DecoratedBox(
+          decoration: const BoxDecoration(gradient: ListenerGradients.shell),
+          child: SafeArea(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                  child: Row(
+                    children: [
+                      ListenerCircleButton(
+                        icon: FLucideIcons.chevronLeft,
+                        onPress: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                ),
+                const Expanded(
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          FLucideIcons.music,
+                          color: ListenerColors.muted,
+                          size: 58,
+                        ),
+                        SizedBox(height: 14),
+                        Text(
+                          '暂无播放内容',
+                          style: TextStyle(color: ListenerColors.muted),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       );
     }
@@ -58,485 +91,483 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     final isPlaying = playerState.value?.playing ?? false;
     final currentPosition = position.value ?? Duration.zero;
     final totalDuration = duration.value ?? Duration.zero;
-    final progress = totalDuration.inSeconds > 0
-        ? currentPosition.inSeconds / totalDuration.inSeconds
+    final progress = totalDuration.inMilliseconds > 0
+        ? currentPosition.inMilliseconds / totalDuration.inMilliseconds
         : 0.0;
-    final playMode = ref.watch(playModeProvider).value ?? PlayMode.sequence;
+    final coverUrl = currentSong.coverArt == null
+        ? null
+        : repository.getCoverArtUrl(currentSong.coverArt!, size: 700);
 
     return FScaffold(
       childPad: false,
-      header: FHeader.nested(
-        prefixes: [
-          FHeaderAction(
-            icon: const Icon(FLucideIcons.chevronDown),
-            onPress: () => Navigator.pop(context),
-          ),
-        ],
-        title: const Text('正在播放'),
-        suffixes: [
-          FHeaderAction(
-            icon: const Icon(FLucideIcons.timer),
-            onPress: () => _showSleepTimerDialog(context),
-          ),
-          FHeaderAction(
-            icon: const Icon(FLucideIcons.ellipsisVertical),
-            onPress: () {},
-          ),
-        ],
-      ),
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              theme.colors.primary.withValues(alpha: 0.16),
-              theme.colors.background,
-            ],
-            stops: const [0.0, 0.5],
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              const Spacer(flex: 1),
-
-              // 专辑封面
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32),
-                child: AspectRatio(
-                  aspectRatio: 1,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.3),
-                          blurRadius: 30,
-                          offset: const Offset(0, 15),
-                        ),
-                      ],
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: Stack(
-                        children: [
-                          // 封面图片
-                          ChansonCoverArt(
-                            imageUrl: currentSong.coverArt == null
-                                ? null
-                                : repository
-                                    .getCoverArtUrl(currentSong.coverArt!),
-                            fallbackIcon: FLucideIcons.music,
-                            borderRadius: 16,
-                          ),
-                          // 毛玻璃效果（可选）
-                          BackdropFilter(
-                            filter: ImageFilter.blur(sigmaX: 0, sigmaY: 0),
-                            child: Container(
-                              color: Colors.transparent,
-                            ),
-                          ),
-                        ],
+      child: DecoratedBox(
+        decoration: const BoxDecoration(gradient: ListenerGradients.shell),
+        child: Stack(
+          children: [
+            Positioned(
+              top: -80,
+              left: -48,
+              right: -48,
+              height: 300,
+              child: Opacity(
+                opacity: 0.18,
+                child: ListenerCoverArt(
+                  imageUrl: coverUrl,
+                  fallbackIcon: FLucideIcons.music,
+                  borderRadius: 0,
+                ),
+              ),
+            ),
+            Positioned.fill(
+              child: SafeArea(
+                bottom: false,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 28),
+                  child: Column(
+                    children: [
+                      _PlayingTopBar(
+                        song: currentSong,
+                        onBack: () => Navigator.pop(context),
+                        onFavorite: () => _toggleFavorite(context, currentSong),
                       ),
-                    ),
-                  ),
-                ),
-              ),
-
-              const Spacer(flex: 1),
-
-              // 歌曲信息
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                currentSong.title,
-                                style: theme.typography.body.xl2.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: theme.colors.foreground,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                currentSong.artist ?? '未知艺术家',
-                                style: theme.typography.body.md.copyWith(
-                                  color: theme.colors.mutedForeground,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                        // 收藏按钮
-                        Consumer(
-                          builder: (context, ref, child) {
-                            final isStarred = ref
-                                .watch(isSongStarredProvider(currentSong.id));
-
-                            return isStarred.when(
-                              data: (starred) => FButton.icon(
-                                variant: FButtonVariant.ghost,
-                                onPress: () async {
-                                  final service =
-                                      ref.read(favoriteServiceProvider);
-                                  if (starred) {
-                                    await service.unstarSong(currentSong.id);
-                                    if (!context.mounted) return;
-                                    showChansonToast(context, '已取消收藏');
-                                  } else {
-                                    await service.starSong(currentSong.id);
-                                    if (!context.mounted) return;
-                                    showChansonToast(context, '已添加到我喜欢的音乐');
-                                  }
-                                  ref.invalidate(starredSongsProvider);
-                                },
-                                child: Icon(
-                                  starred
-                                      ? FLucideIcons.heart
-                                      : FLucideIcons.heart,
-                                  color: starred
-                                      ? theme.colors.destructive
-                                      : theme.colors.foreground,
-                                ),
-                              ),
-                              loading: () => const SizedBox(
-                                width: 28,
-                                height: 28,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2),
-                              ),
-                              error: (_, __) => FButton.icon(
-                                variant: FButtonVariant.ghost,
-                                onPress: () {},
-                                child: const Icon(FLucideIcons.heart),
-                              ),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 32),
-
-              // 进度条
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32),
-                child: Column(
-                  children: [
-                    FSlider(
-                      control: FSliderControl.liftedContinuous(
-                        value: FSliderValue(max: progress.clamp(0.0, 1.0)),
-                        onChange: (value) {
-                          final newPosition = Duration(
-                            seconds:
-                                (value.max * totalDuration.inSeconds).toInt(),
-                          );
-                          audioService.seek(newPosition);
+                      const SizedBox(height: 20),
+                      _DisplaySwitch(
+                        showLyrics: _showLyrics,
+                        onChanged: (value) {
+                          setState(() => _showLyrics = value);
                         },
                       ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            _formatDuration(currentPosition),
-                            style: theme.typography.body.xs.copyWith(
-                              color: theme.colors.mutedForeground,
-                            ),
-                          ),
-                          Text(
-                            _formatDuration(totalDuration),
-                            style: theme.typography.body.xs.copyWith(
-                              color: theme.colors.mutedForeground,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              // 控制按钮
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    FButton.icon(
-                      variant: FButtonVariant.ghost,
-                      onPress: () {
-                        if (playMode == PlayMode.shuffle) {
-                          audioService.setPlayMode(PlayMode.sequence);
-                        } else {
-                          audioService.setPlayMode(PlayMode.shuffle);
-                        }
-                      },
-                      child: Icon(
-                        playMode == PlayMode.shuffle
-                            ? FLucideIcons.shuffle
-                            : FLucideIcons.shuffle,
-                        color: playMode == PlayMode.shuffle
-                            ? theme.colors.primary
-                            : null,
-                      ),
-                    ),
-                    FButton.icon(
-                      variant: FButtonVariant.ghost,
-                      size: FButtonSizeVariant.lg,
-                      onPress: () {
-                        audioService.previous(
-                          (id) => subsonicService.getStreamUrl(id),
-                        );
-                      },
-                      child: const Icon(FLucideIcons.skipBack),
-                    ),
-                    FButton.icon(
-                      variant: FButtonVariant.primary,
-                      size: FButtonSizeVariant.lg,
-                      onPress: audioService.playPause,
-                      child: Icon(
-                        isPlaying ? FLucideIcons.pause : FLucideIcons.play,
-                      ),
-                    ),
-                    FButton.icon(
-                      variant: FButtonVariant.ghost,
-                      size: FButtonSizeVariant.lg,
-                      onPress: () {
-                        audioService.next(
-                          (id) => subsonicService.getStreamUrl(id),
-                        );
-                      },
-                      child: const Icon(FLucideIcons.skipForward),
-                    ),
-                    FButton.icon(
-                      variant: FButtonVariant.ghost,
-                      onPress: () {
-                        if (playMode == PlayMode.repeatOne) {
-                          audioService.setPlayMode(PlayMode.sequence);
-                        } else {
-                          audioService.setPlayMode(PlayMode.repeatOne);
-                        }
-                      },
-                      child: Icon(
-                        playMode == PlayMode.repeatOne
-                            ? FLucideIcons.repeat1
-                            : FLucideIcons.repeat,
-                        color: playMode == PlayMode.repeatOne
-                            ? theme.colors.primary
-                            : null,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const Spacer(flex: 1),
-
-              // 底部额外功能
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    FButton.icon(
-                      variant: FButtonVariant.ghost,
-                      onPress: () => _showLyricsDialog(context, currentSong),
-                      child: const Icon(FLucideIcons.messageSquareText),
-                    ),
-                    FButton.icon(
-                      variant: FButtonVariant.ghost,
-                      onPress: () {},
-                      child: const Icon(FLucideIcons.share2),
-                    ),
-                    FButton.icon(
-                      variant: FButtonVariant.ghost,
-                      onPress: () => context.push('/play-queue'),
-                      child: const Icon(FLucideIcons.listMusic),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 16),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  String _formatDuration(Duration duration) {
-    String twoDigits(int n) => n.toString().padLeft(2, '0');
-    final minutes = twoDigits(duration.inMinutes.remainder(60));
-    final seconds = twoDigits(duration.inSeconds.remainder(60));
-    return '$minutes:$seconds';
-  }
-
-  void _showLyricsDialog(BuildContext context, currentSong) {
-    showFDialog(
-      context: context,
-      builder: (context, style, animation) => FDialog(
-        animation: animation,
-        constraints: const BoxConstraints(minWidth: 280, maxWidth: 680),
-        builder: (context, style) {
-          final theme = context.theme;
-
-          return SizedBox(
-            height: MediaQuery.of(context).size.height * 0.7,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              currentSong.title,
-                              style: theme.typography.body.lg.copyWith(
-                                color: theme.colors.foreground,
-                                fontWeight: FontWeight.w700,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            Text(
-                              currentSong.artist ?? '未知艺术家',
-                              style: theme.typography.body.sm.copyWith(
-                                color: theme.colors.mutedForeground,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
+                      const SizedBox(height: 22),
+                      if (_showLyrics)
+                        _LyricsStage(song: currentSong)
+                      else
+                        _CoverStage(
+                          coverUrl: coverUrl,
+                          isPlaying: isPlaying,
                         ),
+                      const SizedBox(height: 26),
+                      _SongMeta(song: currentSong),
+                      const SizedBox(height: 22),
+                      _ProgressBlock(
+                        progress: progress.clamp(0.0, 1.0),
+                        currentPosition: currentPosition,
+                        totalDuration: totalDuration,
+                        onSeek: (value) {
+                          audioService.seek(
+                            Duration(
+                              milliseconds:
+                                  (value * totalDuration.inMilliseconds)
+                                      .round(),
+                            ),
+                          );
+                        },
                       ),
-                      FButton.icon(
-                        variant: FButtonVariant.ghost,
-                        size: FButtonSizeVariant.sm,
-                        onPress: () => Navigator.pop(context),
-                        child: const Icon(FLucideIcons.x),
+                      const SizedBox(height: 22),
+                      _PlaybackControls(
+                        isPlaying: isPlaying,
+                        playMode: playMode,
+                        onRepeat: () {
+                          audioService.setPlayMode(
+                            playMode == PlayMode.repeatOne
+                                ? PlayMode.sequence
+                                : PlayMode.repeatOne,
+                          );
+                        },
+                        onPrevious: () => audioService.previous(
+                          (id) => subsonicService.getStreamUrl(id),
+                        ),
+                        onPlayPause: audioService.playPause,
+                        onNext: () => audioService.next(
+                          (id) => subsonicService.getStreamUrl(id),
+                        ),
+                        onQueue: () => context.push('/play-queue'),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  Expanded(
-                    child: LyricsWidget(
-                      artist: currentSong.artist,
-                      title: currentSong.title,
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
-          );
-        },
+          ],
+        ),
       ),
     );
   }
 
-  void _showSleepTimerDialog(BuildContext context) {
-    showFDialog(
-      context: context,
-      builder: (context, style, animation) => Consumer(
-        builder: (context, ref, child) {
-          final sleepTimerState = ref.watch(sleepTimerControllerProvider);
-          final sleepTimerController =
-              ref.read(sleepTimerControllerProvider.notifier);
-          final isRunning = sleepTimerState.isRunning;
+  Future<void> _toggleFavorite(BuildContext context, Song song) async {
+    final service = ref.read(favoriteServiceProvider);
+    final isStarred = await ref.read(isSongStarredProvider(song.id).future);
+    bool ok;
+    if (isStarred) {
+      ok = await service.unstarSong(song.id);
+      if (!context.mounted) return;
+      showChansonToast(context, ok ? '已取消收藏' : '取消收藏失败', destructive: !ok);
+    } else {
+      ok = await service.starSong(song.id);
+      if (!context.mounted) return;
+      showChansonToast(context, ok ? '已添加到我喜欢的音乐' : '收藏失败', destructive: !ok);
+    }
+    if (ok) {
+      ref.invalidate(starredSongsProvider);
+      ref.invalidate(isSongStarredProvider(song.id));
+    }
+  }
+}
 
-          return FDialog(
-            animation: animation,
-            builder: (context, style) => Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('睡眠定时器', style: style.titleTextStyle),
-                  const SizedBox(height: 16),
-                  if (isRunning) ...[
-                    Text('定时器正在运行', style: style.bodyTextStyle),
-                    const SizedBox(height: 12),
-                    FButton(
-                      variant: FButtonVariant.destructive,
-                      onPress: () {
-                        sleepTimerController.cancel();
-                        showChansonToast(context, '已取消睡眠定时器');
-                        Navigator.pop(context);
-                      },
-                      child: const Text('取消定时器'),
-                    ),
-                    const SizedBox(height: 8),
-                  ],
-                  FTile(
-                    prefix: const Icon(FLucideIcons.timer),
-                    title: const Text('15 分钟'),
-                    onPress: () =>
-                        _setSleepTimer(context, const Duration(minutes: 15)),
-                  ),
-                  FTile(
-                    prefix: const Icon(FLucideIcons.timer),
-                    title: const Text('30 分钟'),
-                    onPress: () =>
-                        _setSleepTimer(context, const Duration(minutes: 30)),
-                  ),
-                  FTile(
-                    prefix: const Icon(FLucideIcons.timer),
-                    title: const Text('45 分钟'),
-                    onPress: () =>
-                        _setSleepTimer(context, const Duration(minutes: 45)),
-                  ),
-                  FTile(
-                    prefix: const Icon(FLucideIcons.timer),
-                    title: const Text('60 分钟'),
-                    onPress: () =>
-                        _setSleepTimer(context, const Duration(minutes: 60)),
-                  ),
-                ],
+class _PlayingTopBar extends StatelessWidget {
+  final Song song;
+  final VoidCallback onBack;
+  final VoidCallback onFavorite;
+
+  const _PlayingTopBar({
+    required this.song,
+    required this.onBack,
+    required this.onFavorite,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        ListenerCircleButton(icon: FLucideIcons.chevronLeft, onPress: onBack),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            children: [
+              const Text(
+                '正在播放',
+                style: TextStyle(
+                  color: ListenerColors.muted,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
-            ),
-          );
-        },
+              const SizedBox(height: 3),
+              Text(
+                song.album ?? song.artist ?? '未知来源',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: ListenerColors.foreground,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+        ListenerCircleButton(icon: FLucideIcons.heart, onPress: onFavorite),
+      ],
+    );
+  }
+}
+
+class _DisplaySwitch extends StatelessWidget {
+  final bool showLyrics;
+  final ValueChanged<bool> onChanged;
+
+  const _DisplaySwitch({
+    required this.showLyrics,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(5),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.80),
+        borderRadius: BorderRadius.circular(999),
+        boxShadow: ListenerShadows.soft,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _DisplayPill(
+            label: '封面',
+            active: !showLyrics,
+            onPress: () => onChanged(false),
+          ),
+          _DisplayPill(
+            label: '歌词',
+            active: showLyrics,
+            onPress: () => onChanged(true),
+          ),
+        ],
       ),
     );
   }
+}
 
-  void _setSleepTimer(BuildContext context, Duration duration) {
-    final sleepTimerController =
-        ref.read(sleepTimerControllerProvider.notifier);
-    final audioService = ref.read(audioPlayerServiceProvider);
+class _DisplayPill extends StatelessWidget {
+  final String label;
+  final bool active;
+  final VoidCallback onPress;
 
-    sleepTimerController.setTimer(duration, () {
-      // 定时器结束时停止播放
-      audioService.stop();
-    });
+  const _DisplayPill({
+    required this.label,
+    required this.active,
+    required this.onPress,
+  });
 
-    Navigator.pop(context);
-
-    final minutes = duration.inMinutes;
-    showChansonToast(context, '已设置 $minutes 分钟后停止播放');
+  @override
+  Widget build(BuildContext context) {
+    return FTappable(
+      onPress: onPress,
+      builder: (context, states, child) => AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 10),
+        decoration: BoxDecoration(
+          color: active ? ListenerColors.foreground : Colors.transparent,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: active ? Colors.white : ListenerColors.softText,
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+    );
   }
+}
+
+class _CoverStage extends StatelessWidget {
+  final String? coverUrl;
+  final bool isPlaying;
+
+  const _CoverStage({
+    required this.coverUrl,
+    required this.isPlaying,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 300,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Positioned(
+            right: 36,
+            child: AnimatedRotation(
+              turns: isPlaying ? 1 : 0,
+              duration: const Duration(seconds: 12),
+              child: Container(
+                width: 224,
+                height: 224,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: ListenerColors.foreground,
+                  boxShadow: ListenerShadows.elevated,
+                ),
+                child: Center(
+                  child: Container(
+                    width: 68,
+                    height: 68,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Color(0xFFF7F6F3),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            left: 20,
+            child: Container(
+              width: 230,
+              height: 230,
+              decoration: BoxDecoration(boxShadow: ListenerShadows.elevated),
+              child: ListenerCoverArt(
+                imageUrl: coverUrl,
+                fallbackIcon: FLucideIcons.music,
+                borderRadius: 30,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LyricsStage extends StatelessWidget {
+  final Song song;
+
+  const _LyricsStage({required this.song});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 300,
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: ListenerShadows.soft,
+      ),
+      child: LyricsWidget(artist: song.artist, title: song.title),
+    );
+  }
+}
+
+class _SongMeta extends StatelessWidget {
+  final Song song;
+
+  const _SongMeta({required this.song});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(
+          song.title,
+          textAlign: TextAlign.center,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: ListenerColors.foreground,
+            fontSize: 29,
+            height: 1.05,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          song.artist ?? song.album ?? '未知艺术家',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: ListenerColors.softText,
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ProgressBlock extends StatelessWidget {
+  final double progress;
+  final Duration currentPosition;
+  final Duration totalDuration;
+  final ValueChanged<double> onSeek;
+
+  const _ProgressBlock({
+    required this.progress,
+    required this.currentPosition,
+    required this.totalDuration,
+    required this.onSeek,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        FSlider(
+          control: FSliderControl.liftedContinuous(
+            value: FSliderValue(max: progress),
+            onChange: (value) => onSeek(value.max),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              _formatDuration(currentPosition),
+              style: const TextStyle(
+                color: ListenerColors.muted,
+                fontSize: 12,
+              ),
+            ),
+            Text(
+              _formatDuration(totalDuration),
+              style: const TextStyle(
+                color: ListenerColors.muted,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _PlaybackControls extends StatelessWidget {
+  final bool isPlaying;
+  final PlayMode playMode;
+  final VoidCallback onRepeat;
+  final VoidCallback onPrevious;
+  final VoidCallback onPlayPause;
+  final VoidCallback onNext;
+  final VoidCallback onQueue;
+
+  const _PlaybackControls({
+    required this.isPlaying,
+    required this.playMode,
+    required this.onRepeat,
+    required this.onPrevious,
+    required this.onPlayPause,
+    required this.onNext,
+    required this.onQueue,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        _RoundControl(
+          icon: playMode == PlayMode.repeatOne
+              ? FLucideIcons.repeat1
+              : FLucideIcons.repeat,
+          active: playMode == PlayMode.repeatOne,
+          onPress: onRepeat,
+        ),
+        _RoundControl(icon: FLucideIcons.skipBack, onPress: onPrevious),
+        FButton.icon(
+          size: FButtonSizeVariant.lg,
+          onPress: onPlayPause,
+          child: Icon(isPlaying ? FLucideIcons.pause : FLucideIcons.play),
+        ),
+        _RoundControl(icon: FLucideIcons.skipForward, onPress: onNext),
+        _RoundControl(icon: FLucideIcons.listMusic, onPress: onQueue),
+      ],
+    );
+  }
+}
+
+class _RoundControl extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onPress;
+  final bool active;
+
+  const _RoundControl({
+    required this.icon,
+    required this.onPress,
+    this.active = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return FButton.icon(
+      variant: FButtonVariant.ghost,
+      onPress: onPress,
+      child: Icon(
+        icon,
+        color: active ? ListenerColors.foreground : ListenerColors.softText,
+      ),
+    );
+  }
+}
+
+String _formatDuration(Duration duration) {
+  final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
+  final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
+  return '$minutes:$seconds';
 }

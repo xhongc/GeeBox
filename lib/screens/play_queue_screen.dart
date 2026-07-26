@@ -1,201 +1,440 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:forui/forui.dart';
-import '../providers/audio_player_provider.dart';
-import '../providers/subsonic_provider.dart';
-import '../providers/music_repository_provider.dart';
-import '../models/song.dart';
-import '../widgets/forui_components.dart';
+import 'package:go_router/go_router.dart';
 
-/// 播放队列页面
+import '../models/song.dart';
+import '../providers/audio_player_provider.dart';
+import '../providers/music_repository_provider.dart';
+import '../providers/subsonic_provider.dart';
+import '../widgets/forui_components.dart';
+import '../widgets/listener_components.dart';
+
+/// Listener 风格播放队列页面
 class PlayQueueScreen extends ConsumerWidget {
   const PlayQueueScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final audioService = ref.watch(audioPlayerServiceProvider);
-    final playlistAsync = ref.watch(currentPlaylistProvider);
-    final currentIndexAsync = ref.watch(currentIndexProvider);
-    final playlist = playlistAsync.value ?? const <Song>[];
-    final currentIndex = currentIndexAsync.value ?? -1;
+    final playlist = ref.watch(currentPlaylistProvider).value ?? const <Song>[];
+    final currentIndex = ref.watch(currentIndexProvider).value ?? -1;
+    final currentSong = ref.watch(currentSongProvider).value;
+    final isPlaying = ref.watch(playerStateProvider).value?.playing ?? false;
 
-    return ChansonScaffold(
-      title: '播放队列 (${playlist.length})',
-      suffixes: [
-        if (playlist.isNotEmpty)
-          FHeaderAction(
-            icon: const Icon(FLucideIcons.listX),
-            onPress: () => _showClearQueueDialog(context, ref),
-          ),
-      ],
-      child: playlist.isEmpty
-          ? const Center(
-              child: ChansonEmptyState(
-                icon: FLucideIcons.listMusic,
-                message: '播放队列为空',
+    return CustomScrollView(
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(4, 10, 4, 32),
+          sliver: SliverList(
+            delegate: SliverChildListDelegate([
+              _QueueHeader(
+                count: playlist.length,
+                onGroupCast:
+                    playlist.isEmpty ? null : () => context.push('/group-cast'),
               ),
-            )
-          : ReorderableListView.builder(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              itemCount: playlist.length,
-              onReorderItem: (oldIndex, newIndex) {
-                audioService.moveInQueue(oldIndex, newIndex);
-              },
-              itemBuilder: (context, index) {
-                final song = playlist[index];
-                final isCurrentSong = index == currentIndex;
-
-                return _buildSongItem(
-                  context,
-                  ref,
-                  song,
-                  index,
-                  isCurrentSong,
-                );
-              },
-            ),
+              const SizedBox(height: 16),
+              if (currentSong != null)
+                _CurrentTrackCard(
+                  song: currentSong,
+                  isPlaying: isPlaying,
+                  imageUrl: _coverUrl(ref, currentSong),
+                  onToggle: () =>
+                      ref.read(audioPlayerServiceProvider).playPause(),
+                ),
+              if (playlist.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                _QueueActions(
+                  onShuffle: () => _shuffleQueue(ref, playlist),
+                  onRandom: () => _playRandom(ref, playlist),
+                  onClear: () {
+                    ref.read(audioPlayerServiceProvider).clearQueue();
+                    showChansonToast(context, '已清空播放队列');
+                  },
+                ),
+                const SizedBox(height: 18),
+              ],
+              if (playlist.isEmpty)
+                const SizedBox(
+                  height: 260,
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          FLucideIcons.listMusic,
+                          color: ListenerColors.muted,
+                          size: 54,
+                        ),
+                        SizedBox(height: 14),
+                        Text(
+                          '暂无播放',
+                          style: TextStyle(color: ListenerColors.muted),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else
+                for (final (index, song) in playlist.indexed)
+                  _QueueRow(
+                    song: song,
+                    index: index,
+                    isCurrent: index == currentIndex,
+                    imageUrl: _coverUrl(ref, song),
+                    onPress: () => _playAt(ref, playlist, index),
+                    onRemove: index == currentIndex
+                        ? null
+                        : () {
+                            ref
+                                .read(audioPlayerServiceProvider)
+                                .removeFromQueue(index);
+                            showChansonToast(context, '已从队列中移除 ${song.title}');
+                          },
+                  ),
+            ]),
+          ),
+        ),
+      ],
     );
   }
+}
 
-  Widget _buildSongItem(
-    BuildContext context,
-    WidgetRef ref,
-    Song song,
-    int index,
-    bool isCurrentSong,
-  ) {
-    final repository = ref.read(musicRepositoryProvider);
-    final audioService = ref.read(audioPlayerServiceProvider);
-    final subsonicService = ref.read(subsonicServiceProvider);
-    final theme = context.theme;
+class _QueueHeader extends StatelessWidget {
+  final int count;
+  final VoidCallback? onGroupCast;
 
-    return Dismissible(
-      key: Key('${song.id}_$index'),
-      direction: DismissDirection.endToStart,
-      background: Container(
-        color: theme.colors.destructive,
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 16),
-        child: Icon(
-          FLucideIcons.trash2,
-          color: theme.colors.destructiveForeground,
-        ),
-      ),
-      confirmDismiss: (direction) async {
-        if (isCurrentSong) {
-          showChansonToast(context, '无法删除正在播放的歌曲', destructive: true);
-          return false;
-        }
-        return true;
-      },
-      onDismissed: (direction) {
-        audioService.removeFromQueue(index);
-        showChansonToast(context, '已从队列中移除 ${song.title}');
-      },
-      child: FTile(
-        selected: isCurrentSong,
-        prefix: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(FLucideIcons.gripVertical,
-                color: theme.colors.mutedForeground),
-            const SizedBox(width: 8),
-            SizedBox.square(
-              dimension: 46,
-              child: ChansonCoverArt(
-                imageUrl: song.coverArt == null
-                    ? null
-                    : repository.getCoverArtUrl(song.coverArt!),
-              ),
-            ),
-          ],
-        ),
-        title: Row(
-          children: [
-            if (isCurrentSong) ...[
-              Icon(
-                FLucideIcons.play,
-                color: theme.colors.primary,
-                size: 18,
-              ),
-              const SizedBox(width: 4),
-            ],
-            Expanded(
-              child: Text(
-                song.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+  const _QueueHeader({
+    required this.count,
+    required this.onGroupCast,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '播放队列',
                 style: TextStyle(
-                  fontWeight: isCurrentSong ? FontWeight.w700 : FontWeight.w500,
-                  color: isCurrentSong ? theme.colors.primary : null,
+                  color: ListenerColors.muted,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-            ),
-          ],
+              SizedBox(height: 4),
+              Text(
+                '继续聆听',
+                style: TextStyle(
+                  color: ListenerColors.foreground,
+                  fontSize: 32,
+                  height: 1,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
         ),
-        subtitle: Text(song.artist ?? '未知艺术家'),
-        details: song.duration == null
-            ? null
-            : Text(_formatDuration(song.duration!)),
-        onPress: () {
-          if (!isCurrentSong) {
-            audioService.playAtIndex(
-              index,
-              (songId) => subsonicService.getStreamUrl(songId),
-            );
-          }
+        if (onGroupCast == null)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.88),
+              borderRadius: BorderRadius.circular(999),
+              boxShadow: ListenerShadows.soft,
+            ),
+            child: Text(
+              '$count 首',
+              style: const TextStyle(
+                color: ListenerColors.foreground,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          )
+        else
+          FButton(
+            size: FButtonSizeVariant.sm,
+            variant: FButtonVariant.secondary,
+            onPress: onGroupCast,
+            prefix: const Icon(FLucideIcons.radioTower, size: 16),
+            child: const Text('同播'),
+          ),
+      ],
+    );
+  }
+}
+
+class _CurrentTrackCard extends StatelessWidget {
+  final Song song;
+  final String? imageUrl;
+  final bool isPlaying;
+  final VoidCallback onToggle;
+
+  const _CurrentTrackCard({
+    required this.song,
+    required this.imageUrl,
+    required this.isPlaying,
+    required this.onToggle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        gradient: ListenerGradients.darkPlayer,
+        borderRadius: BorderRadius.circular(27),
+        boxShadow: ListenerShadows.elevated,
+      ),
+      child: Row(
+        children: [
+          SizedBox.square(
+            dimension: 64,
+            child: ListenerCoverArt(imageUrl: imageUrl, borderRadius: 16),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '当前播放',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.65),
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  song.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  song.artist ?? song.album ?? '未知艺术家',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.68),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          FButton.icon(
+            variant: FButtonVariant.secondary,
+            onPress: onToggle,
+            child: Icon(
+              isPlaying ? FLucideIcons.pause : FLucideIcons.play,
+              color: ListenerColors.foreground,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QueueActions extends StatelessWidget {
+  final VoidCallback onShuffle;
+  final VoidCallback onRandom;
+  final VoidCallback onClear;
+
+  const _QueueActions({
+    required this.onShuffle,
+    required this.onRandom,
+    required this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        _QueueAction(
+            icon: FLucideIcons.shuffle, label: '打乱', onPress: onShuffle),
+        const SizedBox(width: 11),
+        _QueueAction(icon: FLucideIcons.play, label: '随机', onPress: onRandom),
+        const SizedBox(width: 11),
+        _QueueAction(icon: FLucideIcons.trash2, label: '清空', onPress: onClear),
+      ],
+    );
+  }
+}
+
+class _QueueAction extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onPress;
+
+  const _QueueAction({
+    required this.icon,
+    required this.label,
+    required this.onPress,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: FTappable(
+        onPress: onPress,
+        builder: (context, states, child) {
+          return Container(
+            padding: const EdgeInsets.symmetric(vertical: 13),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.80),
+              borderRadius: BorderRadius.circular(19),
+              boxShadow: ListenerShadows.soft,
+            ),
+            child: Column(
+              children: [
+                Icon(icon, color: ListenerColors.foreground, size: 20),
+                const SizedBox(height: 6),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: ListenerColors.foreground,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          );
         },
       ),
     );
   }
+}
 
-  void _showClearQueueDialog(BuildContext context, WidgetRef ref) {
-    showFDialog(
-      context: context,
-      builder: (context, style, animation) => FDialog(
-        animation: animation,
-        builder: (context, style) => Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+class _QueueRow extends StatelessWidget {
+  final Song song;
+  final int index;
+  final bool isCurrent;
+  final String? imageUrl;
+  final VoidCallback onPress;
+  final VoidCallback? onRemove;
+
+  const _QueueRow({
+    required this.song,
+    required this.index,
+    required this.isCurrent,
+    required this.imageUrl,
+    required this.onPress,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return FTappable(
+      onPress: onPress,
+      builder: (context, states, child) {
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 13),
+          decoration: BoxDecoration(
+            color: isCurrent
+                ? Colors.white.withValues(alpha: 0.94)
+                : Colors.white.withValues(alpha: 0.74),
+            borderRadius: BorderRadius.circular(22),
+            boxShadow: isCurrent ? ListenerShadows.soft : null,
+          ),
+          child: Row(
             children: [
-              Text('清空队列', style: style.titleTextStyle),
-              const SizedBox(height: 8),
-              Text('确定要清空播放队列吗？', style: style.bodyTextStyle),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  FButton(
-                    variant: FButtonVariant.outline,
-                    onPress: () => Navigator.pop(context),
-                    child: const Text('取消'),
+              SizedBox(
+                width: 22,
+                child: Text(
+                  '${index + 1}',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: ListenerColors.muted,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
                   ),
-                  const SizedBox(width: 8),
-                  FButton(
-                    variant: FButtonVariant.destructive,
-                    onPress: () {
-                      final audioService = ref.read(audioPlayerServiceProvider);
-                      audioService.clearQueue();
-                      showChansonToast(context, '已清空播放队列');
-                      Navigator.pop(context);
-                      Navigator.pop(context); // 关闭队列页面
-                    },
-                    child: const Text('确定'),
-                  ),
-                ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              SizedBox.square(
+                dimension: 51,
+                child: ListenerCoverArt(imageUrl: imageUrl, borderRadius: 15),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      song.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: ListenerColors.foreground,
+                        fontSize: 15,
+                        fontWeight:
+                            isCurrent ? FontWeight.w800 : FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      song.artist ?? song.album ?? '未知艺术家',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: ListenerColors.muted,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              FButton.icon(
+                variant: FButtonVariant.ghost,
+                size: FButtonSizeVariant.sm,
+                onPress: onRemove,
+                child: const Icon(
+                  FLucideIcons.minus,
+                  color: ListenerColors.muted,
+                ),
               ),
             ],
           ),
-        ),
-      ),
+        );
+      },
     );
   }
+}
 
-  String _formatDuration(int seconds) {
-    final minutes = seconds ~/ 60;
-    final remainingSeconds = seconds % 60;
-    return '$minutes:${remainingSeconds.toString().padLeft(2, '0')}';
-  }
+String? _coverUrl(WidgetRef ref, Song song) {
+  if (song.coverArt == null) return null;
+  return ref.read(musicRepositoryProvider).getCoverArtUrl(song.coverArt!);
+}
+
+Future<void> _playAt(WidgetRef ref, List<Song> songs, int index) async {
+  final audioService = ref.read(audioPlayerServiceProvider);
+  final subsonicService = ref.read(subsonicServiceProvider);
+  await audioService.setPlaylist(songs, initialIndex: index);
+  await audioService.playAtIndex(
+    index,
+    (songId) => subsonicService.getStreamUrl(songId),
+  );
+}
+
+Future<void> _shuffleQueue(WidgetRef ref, List<Song> songs) async {
+  final shuffled = List<Song>.from(songs)..shuffle();
+  await _playAt(ref, shuffled, 0);
+}
+
+Future<void> _playRandom(WidgetRef ref, List<Song> songs) async {
+  if (songs.isEmpty) return;
+  final index = DateTime.now().microsecond % songs.length;
+  await _playAt(ref, songs, index);
 }

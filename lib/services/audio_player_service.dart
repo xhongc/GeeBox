@@ -5,17 +5,81 @@ import '../models/song.dart';
 
 /// 播放模式枚举
 enum PlayMode {
-  sequence,  // 顺序播放
-  shuffle,   // 随机播放
+  sequence, // 顺序播放
+  shuffle, // 随机播放
   repeatOne, // 单曲循环
+}
+
+abstract class AudioPlaybackBackend {
+  bool get playing;
+  Stream<PlayerState> get playerStateStream;
+  Stream<Duration> get positionStream;
+  Stream<Duration?> get durationStream;
+
+  Future<void> setUrl(String url);
+  Future<void> play();
+  Future<void> pause();
+  Future<void> stop();
+  Future<void> seek(Duration position);
+  Future<void> setLoopMode(LoopMode mode);
+  Future<void> setShuffleModeEnabled(bool enabled);
+  Future<void> dispose();
+}
+
+class JustAudioPlaybackBackend implements AudioPlaybackBackend {
+  final AudioPlayer _player;
+
+  JustAudioPlaybackBackend([AudioPlayer? player])
+      : _player = player ?? AudioPlayer();
+
+  AudioPlayer get player => _player;
+
+  @override
+  bool get playing => _player.playing;
+
+  @override
+  Stream<PlayerState> get playerStateStream => _player.playerStateStream;
+
+  @override
+  Stream<Duration> get positionStream => _player.positionStream;
+
+  @override
+  Stream<Duration?> get durationStream => _player.durationStream;
+
+  @override
+  Future<void> setUrl(String url) => _player.setUrl(url);
+
+  @override
+  Future<void> play() => _player.play();
+
+  @override
+  Future<void> pause() => _player.pause();
+
+  @override
+  Future<void> stop() => _player.stop();
+
+  @override
+  Future<void> seek(Duration position) => _player.seek(position);
+
+  @override
+  Future<void> setLoopMode(LoopMode mode) => _player.setLoopMode(mode);
+
+  @override
+  Future<void> setShuffleModeEnabled(bool enabled) =>
+      _player.setShuffleModeEnabled(enabled);
+
+  @override
+  Future<void> dispose() => _player.dispose();
 }
 
 class AudioPlayerService {
   static final AudioPlayerService _instance = AudioPlayerService._internal();
   factory AudioPlayerService() => _instance;
-  AudioPlayerService._internal();
+  AudioPlayerService._internal() : _backend = JustAudioPlaybackBackend();
+  @visibleForTesting
+  AudioPlayerService.testing(AudioPlaybackBackend backend) : _backend = backend;
 
-  final AudioPlayer _player = AudioPlayer();
+  final AudioPlaybackBackend _backend;
   List<Song> _playlist = [];
   int _currentIndex = -1;
   PlayMode _playMode = PlayMode.sequence;
@@ -27,16 +91,16 @@ class AudioPlayerService {
   Function(String)? _onScrobble;
 
   // Getters
-  AudioPlayer get player => _player;
+  AudioPlaybackBackend get player => _backend;
   List<Song> get playlist => _playlist;
   int get currentIndex => _currentIndex;
   PlayMode get playMode => _playMode;
   Song? get currentSong => _currentSong;
 
   // 播放状态流
-  Stream<PlayerState> get playerStateStream => _player.playerStateStream;
-  Stream<Duration> get positionStream => _player.positionStream;
-  Stream<Duration?> get durationStream => _player.durationStream;
+  Stream<PlayerState> get playerStateStream => _backend.playerStateStream;
+  Stream<Duration> get positionStream => _backend.positionStream;
+  Stream<Duration?> get durationStream => _backend.durationStream;
 
   // 当前歌曲流 - 用于通知 UI 更新
   final _currentSongController = StreamController<Song?>.broadcast();
@@ -103,16 +167,16 @@ class AudioPlayerService {
     // 根据播放模式设置 just_audio 的循环模式
     switch (mode) {
       case PlayMode.sequence:
-        _player.setLoopMode(LoopMode.off);
-        _player.setShuffleModeEnabled(false);
+        _backend.setLoopMode(LoopMode.off);
+        _backend.setShuffleModeEnabled(false);
         break;
       case PlayMode.shuffle:
-        _player.setLoopMode(LoopMode.off);
-        _player.setShuffleModeEnabled(true);
+        _backend.setLoopMode(LoopMode.off);
+        _backend.setShuffleModeEnabled(true);
         break;
       case PlayMode.repeatOne:
-        _player.setLoopMode(LoopMode.one);
-        _player.setShuffleModeEnabled(false);
+        _backend.setLoopMode(LoopMode.one);
+        _backend.setShuffleModeEnabled(false);
         break;
     }
   }
@@ -155,11 +219,11 @@ class AudioPlayerService {
       // 取消之前的监听
       _positionSubscription?.cancel();
 
-      await _player.setUrl(streamUrl);
-      await _player.play();
+      await _backend.setUrl(streamUrl);
+      await _backend.play();
 
       // 监听播放进度，30秒后提交 scrobble
-      _positionSubscription = _player.positionStream.listen((position) {
+      _positionSubscription = _backend.positionStream.listen((position) {
         if (position.inSeconds >= 30 && !_hasScrobbled && _onScrobble != null) {
           _onScrobble!(song.id);
           _hasScrobbled = true;
@@ -171,7 +235,8 @@ class AudioPlayerService {
   }
 
   /// 播放当前播放列表中的歌曲
-  Future<void> playAtIndex(int index, String Function(String) getStreamUrl) async {
+  Future<void> playAtIndex(
+      int index, String Function(String) getStreamUrl) async {
     if (index < 0 || index >= _playlist.length) return;
 
     _currentIndex = index;
@@ -183,10 +248,10 @@ class AudioPlayerService {
 
   /// 播放/暂停
   Future<void> playPause() async {
-    if (_player.playing) {
-      await _player.pause();
+    if (_backend.playing) {
+      await _backend.pause();
     } else {
-      await _player.play();
+      await _backend.play();
     }
   }
 
@@ -206,12 +271,12 @@ class AudioPlayerService {
 
   /// 跳转到指定位置
   Future<void> seek(Duration position) async {
-    await _player.seek(position);
+    await _backend.seek(position);
   }
 
   /// 停止播放
   Future<void> stop() async {
-    await _player.stop();
+    await _backend.stop();
     _currentSong = null;
     _currentSongController.add(null);
   }
@@ -223,12 +288,21 @@ class AudioPlayerService {
     await _playlistController.close();
     await _currentIndexController.close();
     await _playModeController.close();
-    await _player.dispose();
+    await _backend.dispose();
   }
 
   /// 添加歌曲到队列末尾
   void addToQueue(Song song) {
     _playlist.add(song);
+    _playlistController.add(List.unmodifiable(_playlist));
+  }
+
+  /// 添加歌曲到当前歌曲之后
+  void addNext(Song song) {
+    final insertIndex = _currentIndex >= 0 && _currentIndex < _playlist.length
+        ? _currentIndex + 1
+        : _playlist.length;
+    _playlist.insert(insertIndex, song);
     _playlistController.add(List.unmodifiable(_playlist));
   }
 

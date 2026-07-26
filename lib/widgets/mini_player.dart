@@ -4,6 +4,7 @@ import 'package:forui/forui.dart';
 import '../providers/audio_player_provider.dart';
 import '../providers/music_repository_provider.dart';
 import '../providers/subsonic_provider.dart';
+import 'listener_components.dart';
 
 /// 底部迷你播放器
 class MiniPlayer extends ConsumerWidget {
@@ -16,106 +17,105 @@ class MiniPlayer extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = context.theme;
-    final audioService = ref.watch(audioPlayerServiceProvider);
     final playerState = ref.watch(playerStateProvider);
     final subsonicService = ref.watch(subsonicServiceProvider);
     final repository = ref.watch(musicRepositoryProvider);
     final currentSong = ref.watch(currentSongProvider).value;
 
-    if (currentSong == null) {
-      return const SizedBox.shrink();
-    }
-
     final isPlaying = playerState.value?.playing ?? false;
+    final hasTrack = currentSong != null;
+    final imageUrl = currentSong?.coverArt == null
+        ? null
+        : repository.getCoverArtUrl(currentSong!.coverArt!, size: 160);
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(10, 6, 10, 8),
-      child: FCard(
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: onTap,
-          child: SizedBox(
-            height: 64,
-            child: Row(
-              children: [
-                Container(
-                  width: 56,
-                  height: 56,
-                  margin: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: theme.colors.muted,
-                    borderRadius: BorderRadius.circular(6),
+    return Opacity(
+      opacity: hasTrack ? 1 : 0.94,
+      child: FTappable(
+        onPress: () {
+          if (hasTrack) onTap();
+        },
+        builder: (context, states, child) {
+          return AnimatedScale(
+            scale: states.contains(FTappableVariant.pressed) ? 0.99 : 1,
+            duration: const Duration(milliseconds: 120),
+            child: Container(
+              height: 76,
+              padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
+              decoration: BoxDecoration(
+                gradient: ListenerGradients.darkPlayer,
+                borderRadius: BorderRadius.circular(26),
+                boxShadow: ListenerShadows.elevated,
+              ),
+              child: Row(
+                children: [
+                  SizedBox.square(
+                    dimension: 51,
+                    child: ListenerCoverArt(
+                      imageUrl: imageUrl,
+                      borderRadius: 16,
+                    ),
                   ),
-                  child: currentSong.coverArt != null
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(6),
-                          child: Image.network(
-                            repository.getCoverArtUrl(currentSong.coverArt!),
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Icon(
-                                FLucideIcons.music,
-                                color: theme.colors.mutedForeground,
-                              );
-                            },
-                          ),
-                        )
-                      : Icon(
-                          FLucideIcons.music,
-                          color: theme.colors.mutedForeground,
-                        ),
-                ),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                  const SizedBox(width: 14),
+                  Expanded(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          currentSong.title,
-                          style: theme.typography.body.sm.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: theme.colors.foreground,
-                          ),
+                          currentSong?.title ?? '暂无播放内容',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: 3),
                         Text(
-                          currentSong.artist ?? '未知艺术家',
-                          style: theme.typography.body.xs.copyWith(
-                            color: theme.colors.mutedForeground,
-                          ),
+                          currentSong?.artist ??
+                              currentSong?.album ??
+                              '选择一首歌开始播放',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.68),
+                            fontSize: 12,
+                          ),
                         ),
                       ],
                     ),
                   ),
-                ),
-                FButton.icon(
-                  size: FButtonSizeVariant.sm,
-                  variant: FButtonVariant.ghost,
-                  onPress: audioService.playPause,
-                  child: Icon(
-                    isPlaying ? FLucideIcons.pause : FLucideIcons.play,
+                  FButton.icon(
+                    size: FButtonSizeVariant.sm,
+                    variant: FButtonVariant.secondary,
+                    onPress: hasTrack
+                        ? () => ref.read(audioPlayerServiceProvider).playPause()
+                        : null,
+                    child: Icon(
+                      isPlaying ? FLucideIcons.pause : FLucideIcons.play,
+                      color: ListenerColors.foreground,
+                    ),
                   ),
-                ),
-                FButton.icon(
-                  size: FButtonSizeVariant.sm,
-                  variant: FButtonVariant.ghost,
-                  onPress: () {
-                    audioService.next((id) => subsonicService.getStreamUrl(id));
-                  },
-                  child: const Icon(FLucideIcons.skipForward),
-                ),
-                const SizedBox(width: 8),
-              ],
+                  const SizedBox(width: 4),
+                  FButton.icon(
+                    size: FButtonSizeVariant.sm,
+                    variant: FButtonVariant.ghost,
+                    onPress: hasTrack
+                        ? () => ref.read(audioPlayerServiceProvider).next(
+                              (id) => subsonicService.getStreamUrl(id),
+                            )
+                        : null,
+                    child: const Icon(
+                      FLucideIcons.skipForward,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }

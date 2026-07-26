@@ -2,15 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
-import '../models/artist.dart';
-import '../providers/music_repository_provider.dart';
-import '../widgets/error_view.dart';
-import '../widgets/forui_components.dart';
 
-final artistsProvider = FutureProvider.autoDispose<List<Artist>>((ref) async {
-  final repository = ref.watch(musicRepositoryProvider);
-  return await repository.getArtists();
-});
+import '../models/artist.dart';
+import '../models/song.dart';
+import '../providers/audio_player_provider.dart';
+import '../providers/music_repository_provider.dart';
+import '../widgets/forui_components.dart';
+import '../widgets/listener_components.dart';
 
 class ArtistsScreen extends ConsumerStatefulWidget {
   const ArtistsScreen({super.key});
@@ -20,155 +18,468 @@ class ArtistsScreen extends ConsumerStatefulWidget {
 }
 
 class _ArtistsScreenState extends ConsumerState<ArtistsScreen> {
-  String _searchQuery = '';
+  String _sortValue = 'most-albums';
 
   @override
   Widget build(BuildContext context) {
     final artistsAsync = ref.watch(artistsProvider);
+    final filteredSnapshot = artistsAsync.valueOrNull == null
+        ? const <Artist>[]
+        : _filteredArtists(artistsAsync.valueOrNull!);
 
-    return ChansonScaffold(
-      title: '艺术家',
-      suffixes: [
-        FHeaderAction(
-          icon: const Icon(FLucideIcons.refreshCw),
-          onPress: () => ref.invalidate(artistsProvider),
+    return CustomScrollView(
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(4, 10, 4, 32),
+          sliver: SliverList(
+            delegate: SliverChildListDelegate([
+              _ArtistsHero(
+                sortValue: _sortValue,
+                onSort: (value) => setState(() => _sortValue = value),
+                onRefresh: () => ref.invalidate(artistsProvider),
+                count: filteredSnapshot.length,
+                onPlayFirst: filteredSnapshot.isEmpty
+                    ? null
+                    : () => _playArtist(ref, filteredSnapshot.first),
+                onPlayRandom: filteredSnapshot.isEmpty
+                    ? null
+                    : () {
+                        final shuffled = List<Artist>.from(filteredSnapshot)
+                          ..shuffle();
+                        _playArtist(ref, shuffled.first);
+                      },
+              ),
+              const SizedBox(height: 18),
+              artistsAsync.when(
+                data: (artists) {
+                  final filtered = _filteredArtists(artists);
+                  if (filtered.isEmpty) {
+                    return const _ArtistsEmpty();
+                  }
+
+                  return Column(
+                    children: [
+                      for (final artist in filtered)
+                        _ArtistRow(
+                          artist: artist,
+                          imageUrl: artist.coverArt == null
+                              ? null
+                              : ref
+                                  .read(musicRepositoryProvider)
+                                  .getCoverArtUrl(artist.coverArt!, size: 180),
+                          onOpen: () => context.push('/artist-detail', extra: {
+                            'artistId': artist.id,
+                            'artistName': artist.name,
+                            'coverArtId': artist.coverArt,
+                          }),
+                          onPlay: () => _playArtist(ref, artist),
+                        ),
+                    ],
+                  );
+                },
+                loading: () => const SizedBox(
+                  height: 260,
+                  child: Center(child: FCircularProgress()),
+                ),
+                error: (_, __) => SizedBox(
+                  height: 260,
+                  child: Center(
+                    child: FButton(
+                      variant: FButtonVariant.ghost,
+                      onPress: () => ref.invalidate(artistsProvider),
+                      child: const Text('重新加载艺术家'),
+                    ),
+                  ),
+                ),
+              ),
+            ]),
+          ),
         ),
       ],
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: FTextField(
-              hint: '搜索艺术家...',
-              prefixBuilder: (context, style, variants) =>
-                  FTextField.prefixIconBuilder(
-                context,
-                style,
-                variants,
-                const Icon(FLucideIcons.search),
-              ),
-              onSubmit: (value) {
-                setState(() {
-                  _searchQuery = value.toLowerCase();
-                });
-              },
-              onEditingComplete: () {},
-              control: FTextFieldControl.managed(
-                onChange: (value) {
-                  setState(() {
-                    _searchQuery = value.text.toLowerCase();
-                  });
-                },
-              ),
-            ),
-          ),
-          Expanded(
-            child: artistsAsync.when(
-              data: (artists) {
-                if (artists.isEmpty) {
-                  return const ChansonEmptyState(
-                    icon: FLucideIcons.userRound,
-                    message: '暂无艺术家',
-                  );
-                }
-
-                final filteredArtists = _searchQuery.isEmpty
-                    ? artists
-                    : artists
-                        .where(
-                          (artist) =>
-                              artist.name.toLowerCase().contains(_searchQuery),
-                        )
-                        .toList();
-
-                if (filteredArtists.isEmpty) {
-                  return const ChansonEmptyState(
-                    icon: FLucideIcons.searchX,
-                    message: '未找到匹配的艺术家',
-                  );
-                }
-
-                final groupedArtists = _groupArtistsByInitial(filteredArtists);
-
-                return ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                  children: [
-                    for (final entry in groupedArtists.entries)
-                      _buildArtistGroup(context, entry.key, entry.value),
-                  ],
-                );
-              },
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, stack) => error.toErrorWidget(
-                onRetry: () => ref.invalidate(artistsProvider),
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 
-  Map<String, List<Artist>> _groupArtistsByInitial(List<Artist> artists) {
-    final grouped = <String, List<Artist>>{};
+  List<Artist> _filteredArtists(List<Artist> artists) {
+    final filtered = List<Artist>.from(artists);
 
-    for (final artist in artists) {
-      final initial =
-          artist.name.isNotEmpty ? artist.name[0].toUpperCase() : '#';
-      final key = RegExp(r'^[A-Z]$').hasMatch(initial) ? initial : '#';
-      grouped.putIfAbsent(key, () => []).add(artist);
+    switch (_sortValue) {
+      case 'a-z':
+        filtered.sort((a, b) => a.name.compareTo(b.name));
+        break;
+      case 'less_cover':
+        filtered.sort((a, b) {
+          final aMissing = a.coverArt == null || a.coverArt!.isEmpty;
+          final bMissing = b.coverArt == null || b.coverArt!.isEmpty;
+          if (aMissing == bMissing) return a.name.compareTo(b.name);
+          return aMissing ? -1 : 1;
+        });
+        break;
+      default:
+        filtered.sort(
+          (a, b) => (b.albumCount ?? 0).compareTo(a.albumCount ?? 0),
+        );
     }
 
-    final sortedKeys = grouped.keys.toList()
-      ..sort((a, b) {
-        if (a == '#') return 1;
-        if (b == '#') return -1;
-        return a.compareTo(b);
-      });
-
-    return {
-      for (final key in sortedKeys) key: grouped[key]!,
-    };
+    return filtered;
   }
+}
 
-  Widget _buildArtistGroup(
-    BuildContext context,
-    String initial,
-    List<Artist> artists,
-  ) {
-    return ChansonSection(
-      title: initial,
+class _ArtistsHero extends StatelessWidget {
+  final String sortValue;
+  final ValueChanged<String> onSort;
+  final VoidCallback onRefresh;
+  final int count;
+  final VoidCallback? onPlayFirst;
+  final VoidCallback? onPlayRandom;
+
+  const _ArtistsHero({
+    required this.sortValue,
+    required this.onSort,
+    required this.onRefresh,
+    required this.count,
+    required this.onPlayFirst,
+    required this.onPlayRandom,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final title = switch (sortValue) {
+      'a-z' => 'A-Z排序',
+      'less_cover' => '缺失封面',
+      _ => '最多专辑',
+    };
+    final summary = switch (sortValue) {
+      'a-z' => '按名称浏览艺术家列表，找人会更直接。',
+      'less_cover' => '这里是还缺封面的艺术家，后续可以继续补全。',
+      _ => '优先查看作品最多的艺术家，适合顺着专辑量往下听。',
+    };
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        for (final artist in artists) _buildArtistItem(context, artist),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '艺术家收藏',
+                    style: TextStyle(
+                      color: ListenerColors.muted,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: ListenerColors.foreground,
+                      fontSize: 32,
+                      height: 1,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            ListenerCircleButton(
+              icon: FLucideIcons.refreshCw,
+              onPress: onRefresh,
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            _ArtistTab(
+              label: '最多专辑',
+              value: 'most-albums',
+              selected: sortValue,
+              onSort: onSort,
+            ),
+            const SizedBox(width: 10),
+            _ArtistTab(
+              label: 'A-Z排序',
+              value: 'a-z',
+              selected: sortValue,
+              onSort: onSort,
+            ),
+            const SizedBox(width: 10),
+            _ArtistTab(
+              label: '缺失封面',
+              value: 'less_cover',
+              selected: sortValue,
+              onSort: onSort,
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.80),
+            borderRadius: BorderRadius.circular(26),
+            boxShadow: ListenerShadows.soft,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '当前视图',
+                style: TextStyle(
+                  color: ListenerColors.muted,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                title,
+                style: const TextStyle(
+                  color: ListenerColors.foreground,
+                  fontSize: 19,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '$summary 当前加载 $count 位。',
+                style: const TextStyle(
+                  color: ListenerColors.softText,
+                  fontSize: 13,
+                  height: 1.35,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: FButton(
+                      onPress: onPlayFirst,
+                      prefix: const Icon(FLucideIcons.play, size: 17),
+                      child: const Text('播放第一位'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FButton(
+                      variant: FButtonVariant.outline,
+                      onPress: onPlayRandom,
+                      prefix: const Icon(FLucideIcons.shuffle, size: 17),
+                      child: const Text('随机一位'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }
+}
 
-  Widget _buildArtistItem(BuildContext context, Artist artist) {
-    final repository = ref.read(musicRepositoryProvider);
+class _ArtistTab extends StatelessWidget {
+  final String label;
+  final String value;
+  final String selected;
+  final ValueChanged<String> onSort;
 
-    return FTile(
-      prefix: SizedBox.square(
-        dimension: 42,
-        child: ChansonCoverArt(
-          imageUrl: artist.coverArt == null
-              ? null
-              : repository.getCoverArtUrl(artist.coverArt!, size: 100),
-          fallbackIcon: FLucideIcons.userRound,
-          borderRadius: 21,
+  const _ArtistTab({
+    required this.label,
+    required this.value,
+    required this.selected,
+    required this.onSort,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final active = selected == value;
+
+    return Expanded(
+      child: FTappable(
+        onPress: () => onSort(value),
+        builder: (context, states, child) => AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(vertical: 11),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: active
+                ? ListenerColors.foreground
+                : Colors.white.withValues(alpha: 0.74),
+            borderRadius: BorderRadius.circular(999),
+            boxShadow: ListenerShadows.soft,
+          ),
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: active ? Colors.white : ListenerColors.softText,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ),
       ),
-      title: Text(artist.name),
-      subtitle:
-          artist.albumCount == null ? null : Text('${artist.albumCount} 张专辑'),
-      suffix: const Icon(FLucideIcons.chevronRight),
-      onPress: () {
-        context.push('/artist-detail', extra: {
-          'artistId': artist.id,
-          'artistName': artist.name,
-          'coverArtId': artist.coverArt,
-        });
-      },
+    );
+  }
+}
+
+class _ArtistRow extends StatelessWidget {
+  final Artist artist;
+  final String? imageUrl;
+  final VoidCallback onOpen;
+  final VoidCallback onPlay;
+
+  const _ArtistRow({
+    required this.artist,
+    required this.imageUrl,
+    required this.onOpen,
+    required this.onPlay,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.74),
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: ListenerShadows.soft,
+      ),
+      child: FTappable(
+        onPress: onOpen,
+        builder: (context, states, child) => Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              SizedBox.square(
+                dimension: 58,
+                child: ListenerCoverArt(
+                  imageUrl: imageUrl,
+                  fallbackIcon: FLucideIcons.userRound,
+                  borderRadius: 18,
+                ),
+              ),
+              const SizedBox(width: 13),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      artist.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: ListenerColors.foreground,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      '${artist.albumCount ?? 0} 张专辑',
+                      style: const TextStyle(
+                        color: ListenerColors.muted,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              FTappable(
+                onPress: onPlay,
+                builder: (context, states, child) {
+                  return AnimatedScale(
+                    duration: const Duration(milliseconds: 120),
+                    scale: states.contains(FTappableVariant.pressed) ? 0.94 : 1,
+                    child: Container(
+                      width: 42,
+                      height: 42,
+                      decoration: const BoxDecoration(
+                        color: ListenerColors.foreground,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        FLucideIcons.play,
+                        color: Colors.white,
+                        size: 18,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+Future<void> _playArtist(WidgetRef ref, Artist artist) async {
+  final context = ref.context;
+  try {
+    final repository = ref.read(musicRepositoryProvider);
+    final songs = await repository.getArtistSongs(artist.id);
+    if (!context.mounted) return;
+    if (songs.isEmpty) {
+      showChansonToast(context, '这位艺术家暂无歌曲');
+      return;
+    }
+    await _playSongs(ref, songs);
+  } catch (error) {
+    if (!context.mounted) return;
+    showChansonToast(context, '播放艺术家失败: $error', destructive: true);
+  }
+}
+
+Future<void> _playSongs(WidgetRef ref, List<Song> songs) async {
+  final player = ref.read(audioPlayerServiceProvider);
+  final repository = ref.read(musicRepositoryProvider);
+  await player.setPlaylist(songs);
+  await player.playAtIndex(
+    0,
+    (songId) => repository.getStreamUrl(songId),
+  );
+}
+
+class _ArtistsEmpty extends StatelessWidget {
+  const _ArtistsEmpty();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SizedBox(
+      height: 260,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(FLucideIcons.userRound, color: ListenerColors.muted, size: 54),
+            SizedBox(height: 14),
+            Text(
+              '还没有艺术家',
+              style: TextStyle(
+                color: ListenerColors.foreground,
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            SizedBox(height: 8),
+            Text(
+              '这个分类下暂时没有内容，切换一个筛选看看。',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: ListenerColors.muted),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

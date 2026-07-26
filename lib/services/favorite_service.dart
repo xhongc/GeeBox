@@ -1,5 +1,6 @@
 import 'subsonic_service.dart';
 import '../models/song.dart';
+import '../models/starred_items.dart';
 
 /// 收藏服务
 class FavoriteService {
@@ -20,6 +21,11 @@ class FavoriteService {
   /// 获取收藏的歌曲列表
   Future<List<Song>> getStarredSongs() async {
     return await _subsonicService.getStarredSongs();
+  }
+
+  /// 获取收藏歌曲、专辑和艺术家
+  Future<StarredItems> getStarred2() async {
+    return await _subsonicService.getStarred2();
   }
 
   /// 收藏专辑

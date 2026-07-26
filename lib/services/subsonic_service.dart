@@ -5,6 +5,8 @@ import 'package:flutter/foundation.dart';
 import '../models/song.dart';
 import '../models/album.dart';
 import '../models/artist.dart';
+import '../models/genre.dart';
+import '../models/starred_items.dart';
 import '../exceptions/subsonic_exceptions.dart';
 
 class SubsonicService {
@@ -27,7 +29,9 @@ class SubsonicService {
     required String username,
     required String password,
   }) {
-    _serverUrl = serverUrl.endsWith('/') ? serverUrl.substring(0, serverUrl.length - 1) : serverUrl;
+    _serverUrl = serverUrl.endsWith('/')
+        ? serverUrl.substring(0, serverUrl.length - 1)
+        : serverUrl;
     _username = username;
     _password = password;
     _isConfigured = true;
@@ -143,7 +147,8 @@ class SubsonicService {
       );
 
       return _handleResponse(response, (data) {
-        if (data['randomSongs'] != null && data['randomSongs']['song'] != null) {
+        if (data['randomSongs'] != null &&
+            data['randomSongs']['song'] != null) {
           final songs = data['randomSongs']['song'] as List;
           return songs.map((json) => Song.fromJson(json)).toList();
         }
@@ -225,6 +230,35 @@ class SubsonicService {
     }
   }
 
+  /// 获取单曲详情
+  Future<Song?> getSong(String songId) async {
+    _ensureConfigured();
+
+    try {
+      final params = _getAuthParams();
+      params['id'] = songId;
+
+      final response = await _dio.get(
+        '$_serverUrl/rest/getSong',
+        queryParameters: params,
+      );
+
+      return _handleResponse(response, (data) {
+        if (data['song'] != null) {
+          return Song.fromJson((data['song'] as Map).cast<String, dynamic>());
+        }
+        return null;
+      });
+    } on DioException catch (e) {
+      _handleDioException(e);
+    } on SubsonicException {
+      rethrow;
+    } catch (e) {
+      debugPrint('Get song error: $e');
+      throw ParseException('获取歌曲详情失败: $e');
+    }
+  }
+
   /// 获取歌曲流媒体 URL
   String getStreamUrl(String songId) {
     if (!_isConfigured) return '';
@@ -269,11 +303,22 @@ class SubsonicService {
         if (data['searchResult3'] != null) {
           final result = data['searchResult3'];
           return {
-            'songs': (result['song'] as List?)?.map((json) => Song.fromJson(json)).toList() ?? [],
-            'albums': (result['album'] as List?)?.map((json) => Album.fromJson(json)).toList() ?? [],
+            'songs': _asList(result['song'])
+                .map((json) => Song.fromJson(json.cast<String, dynamic>()))
+                .toList(),
+            'albums': _asList(result['album'])
+                .map((json) => Album.fromJson(json.cast<String, dynamic>()))
+                .toList(),
+            'artists': _asList(result['artist'])
+                .map((json) => Artist.fromJson(json.cast<String, dynamic>()))
+                .toList(),
           };
         }
-        return {'songs': <Song>[], 'albums': <Album>[]};
+        return {
+          'songs': <Song>[],
+          'albums': <Album>[],
+          'artists': <Artist>[],
+        };
       });
     } on DioException catch (e) {
       _handleDioException(e);
@@ -283,6 +328,12 @@ class SubsonicService {
       debugPrint('Search error: $e');
       throw ParseException('搜索失败: $e');
     }
+  }
+
+  List<Map> _asList(dynamic value) {
+    if (value is List) return value.whereType<Map>().toList();
+    if (value is Map) return [value];
+    return const <Map>[];
   }
 
   // ==================== 播放列表相关 API ====================
@@ -524,9 +575,11 @@ class SubsonicService {
               if (index['artist'] != null) {
                 final artistList = index['artist'];
                 if (artistList is List) {
-                  artists.addAll(artistList.map((json) => Artist.fromJson(json)));
+                  artists
+                      .addAll(artistList.map((json) => Artist.fromJson(json)));
                 } else if (artistList is Map) {
-                  artists.add(Artist.fromJson(artistList.cast<String, dynamic>()));
+                  artists
+                      .add(Artist.fromJson(artistList.cast<String, dynamic>()));
                 }
               }
             }
@@ -655,6 +708,43 @@ class SubsonicService {
     }
   }
 
+  /// 获取收藏歌曲、专辑和艺术家
+  Future<StarredItems> getStarred2() async {
+    _ensureConfigured();
+
+    try {
+      final response = await _dio.get(
+        '$_serverUrl/rest/getStarred2',
+        queryParameters: _getAuthParams(),
+      );
+
+      return _handleResponse(response, (data) {
+        if (data['starred2'] != null) {
+          final starred = data['starred2'];
+          return StarredItems(
+            songs: _asList(starred['song'])
+                .map((json) => Song.fromJson(json.cast<String, dynamic>()))
+                .toList(),
+            albums: _asList(starred['album'])
+                .map((json) => Album.fromJson(json.cast<String, dynamic>()))
+                .toList(),
+            artists: _asList(starred['artist'])
+                .map((json) => Artist.fromJson(json.cast<String, dynamic>()))
+                .toList(),
+          );
+        }
+        return const StarredItems();
+      });
+    } on DioException catch (e) {
+      _handleDioException(e);
+    } on SubsonicException {
+      rethrow;
+    } catch (e) {
+      debugPrint('Get starred2 error: $e');
+      throw ParseException('获取收藏列表失败: $e');
+    }
+  }
+
   /// 提交播放记录（scrobble）
   Future<bool> scrobble(String id, {int? time, bool submission = true}) async {
     _ensureConfigured();
@@ -716,6 +806,35 @@ class SubsonicService {
     } catch (e) {
       debugPrint('Get songs by genre error: $e');
       throw ParseException('按类型获取歌曲失败: $e');
+    }
+  }
+
+  /// 获取音乐风格列表
+  Future<List<Genre>> getGenres() async {
+    _ensureConfigured();
+
+    try {
+      final response = await _dio.get(
+        '$_serverUrl/rest/getGenres',
+        queryParameters: _getAuthParams(),
+      );
+
+      return _handleResponse(response, (data) {
+        if (data['genres'] != null) {
+          return _asList(data['genres']['genre'])
+              .map((json) => Genre.fromJson(json.cast<String, dynamic>()))
+              .where((genre) => genre.name.trim().isNotEmpty)
+              .toList();
+        }
+        return <Genre>[];
+      });
+    } on DioException catch (e) {
+      _handleDioException(e);
+    } on SubsonicException {
+      rethrow;
+    } catch (e) {
+      debugPrint('Get genres error: $e');
+      throw ParseException('获取风格列表失败: $e');
     }
   }
 

@@ -2,6 +2,7 @@ import 'package:hive/hive.dart';
 import '../models/search_history.dart';
 import '../models/song.dart';
 import '../models/album.dart';
+import '../models/artist.dart';
 import 'subsonic_service.dart';
 
 class SearchService {
@@ -29,7 +30,7 @@ class SearchService {
   /// 执行搜索
   Future<SearchResult> search(String query) async {
     if (query.trim().isEmpty) {
-      return SearchResult(songs: [], albums: []);
+      return SearchResult(songs: [], albums: [], artists: []);
     }
 
     // 保存搜索历史
@@ -40,6 +41,7 @@ class SearchService {
     return SearchResult(
       songs: result['songs'] as List<Song>,
       albums: result['albums'] as List<Album>,
+      artists: result['artists'] as List<Artist>? ?? [],
     );
   }
 
@@ -111,12 +113,14 @@ class SearchService {
 class SearchResult {
   final List<Song> songs;
   final List<Album> albums;
+  final List<Artist> artists;
 
   SearchResult({
     required this.songs,
     required this.albums,
+    required this.artists,
   });
 
-  bool get isEmpty => songs.isEmpty && albums.isEmpty;
+  bool get isEmpty => songs.isEmpty && albums.isEmpty && artists.isEmpty;
   bool get isNotEmpty => !isEmpty;
 }
