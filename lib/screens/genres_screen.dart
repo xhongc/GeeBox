@@ -24,73 +24,75 @@ class _GenresScreenState extends ConsumerState<GenresScreen> {
   Widget build(BuildContext context) {
     final genresAsync = ref.watch(genresProvider(_sort));
 
-    return CustomScrollView(
-      slivers: [
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(4, 10, 4, 32),
-          sliver: SliverList(
-            delegate: SliverChildListDelegate.fixed([
-              _GenresHeading(
-                selected: _sort,
-                onChanged: (value) {
-                  setState(() => _sort = value);
-                },
-                onRefresh: () => ref.invalidate(genresProvider(_sort)),
-              ),
-              const SizedBox(height: 18),
-              _GenresSummary(sort: _sort),
-              const SizedBox(height: 22),
-            ]),
-          ),
-        ),
-        genresAsync.when(
-          data: (genres) {
-            if (genres.isEmpty) {
-              return const SliverFillRemaining(
-                hasScrollBody: false,
-                child: _GenresEmpty(),
-              );
-            }
-
-            return SliverPadding(
-              padding: const EdgeInsets.fromLTRB(4, 0, 4, 32),
-              sliver: SliverGrid(
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  mainAxisSpacing: 14,
-                  crossAxisSpacing: 14,
-                  childAspectRatio: 0.86,
-                ),
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final genre = genres[index];
-                    return _GenreLibraryCard(
-                      genre: genre,
-                      onOpen: () => _openGenre(context, genre),
-                      onPlay: () => _playGenre(context, ref, genre),
-                    );
+    return ListenerPageBackground(
+      child: CustomScrollView(
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 32),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate.fixed([
+                _GenresHeading(
+                  selected: _sort,
+                  onChanged: (value) {
+                    setState(() => _sort = value);
                   },
-                  childCount: genres.length,
+                  onRefresh: () => ref.invalidate(genresProvider(_sort)),
                 ),
-              ),
-            );
-          },
-          loading: () => const SliverFillRemaining(
-            hasScrollBody: false,
-            child: Center(child: FCircularProgress()),
+                const SizedBox(height: 18),
+                _GenresSummary(sort: _sort),
+                const SizedBox(height: 22),
+              ]),
+            ),
           ),
-          error: (_, __) => SliverFillRemaining(
-            hasScrollBody: false,
-            child: Center(
-              child: FButton(
-                variant: FButtonVariant.ghost,
-                onPress: () => ref.invalidate(genresProvider(_sort)),
-                child: const Text('重新加载风格'),
+          genresAsync.when(
+            data: (genres) {
+              if (genres.isEmpty) {
+                return const SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: _GenresEmpty(),
+                );
+              }
+
+              return SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+                sliver: SliverGrid(
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 14,
+                    crossAxisSpacing: 14,
+                    childAspectRatio: 0.86,
+                  ),
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final genre = genres[index];
+                      return _GenreLibraryCard(
+                        genre: genre,
+                        onOpen: () => _openGenre(context, genre),
+                        onPlay: () => _playGenre(context, ref, genre),
+                      );
+                    },
+                    childCount: genres.length,
+                  ),
+                ),
+              );
+            },
+            loading: () => const SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(child: FCircularProgress()),
+            ),
+            error: (_, __) => SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: FButton(
+                  variant: FButtonVariant.ghost,
+                  onPress: () => ref.invalidate(genresProvider(_sort)),
+                  child: const Text('重新加载风格'),
+                ),
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 

@@ -21,7 +21,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   final List<Widget> _screens = const [
     HomeScreen(),
-    AlbumsScreen(),
+    AlbumsScreen(embedded: true),
     PlayQueueScreen(),
     FavoritesScreen(),
   ];

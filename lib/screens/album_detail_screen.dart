@@ -247,18 +247,23 @@ class _AlbumDetailHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    final coverSize = width.clamp(0, 420) * 0.66;
+    final resolvedCoverSize = coverSize.clamp(216.0, 252.0);
+    final discSize = resolvedCoverSize * 0.94;
+
     return Column(
       children: [
         SizedBox(
-          height: 240,
+          height: 300,
           child: Stack(
             alignment: Alignment.center,
             children: [
-              Positioned(
-                right: 34,
+              Transform.translate(
+                offset: Offset(resolvedCoverSize * 0.24, 0),
                 child: Container(
-                  width: 178,
-                  height: 178,
+                  width: discSize,
+                  height: discSize,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: ListenerColors.foreground,
@@ -276,17 +281,17 @@ class _AlbumDetailHero extends StatelessWidget {
                   ),
                 ),
               ),
-              Positioned(
-                left: 24,
+              Align(
+                alignment: Alignment.center,
                 child: Container(
-                  width: 188,
-                  height: 188,
+                  width: resolvedCoverSize,
+                  height: resolvedCoverSize,
                   decoration:
                       BoxDecoration(boxShadow: ListenerShadows.elevated),
                   child: ListenerCoverArt(
                     imageUrl: coverUrl,
                     fallbackIcon: FLucideIcons.disc3,
-                    borderRadius: 28,
+                    borderRadius: 30,
                   ),
                 ),
               ),

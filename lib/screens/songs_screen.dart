@@ -23,103 +23,105 @@ class _SongsScreenState extends ConsumerState<SongsScreen> {
   Widget build(BuildContext context) {
     final songsAsync = ref.watch(songsLibraryProvider(_sort));
 
-    return CustomScrollView(
-      slivers: [
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(4, 10, 4, 32),
-          sliver: SliverList(
-            delegate: SliverChildListDelegate.fixed([
-              _SongsHeading(
-                selected: _sort,
-                onChanged: (value) {
-                  setState(() => _sort = value);
-                },
-                onRefresh: () => ref.invalidate(songsLibraryProvider(_sort)),
-              ),
-              const SizedBox(height: 18),
-              songsAsync.when(
-                data: (songs) => _SongsSummary(
-                  sort: _sort,
-                  count: songs.length,
-                  onPlay: songs.isEmpty ? null : () => _playSongs(ref, songs),
-                  onShuffle:
-                      songs.isEmpty ? null : () => _shuffleSongs(ref, songs),
+    return ListenerPageBackground(
+      child: CustomScrollView(
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 32),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate.fixed([
+                _SongsHeading(
+                  selected: _sort,
+                  onChanged: (value) {
+                    setState(() => _sort = value);
+                  },
+                  onRefresh: () => ref.invalidate(songsLibraryProvider(_sort)),
                 ),
-                loading: () => _SongsSummary(
-                  sort: _sort,
-                  count: 0,
-                  loading: true,
-                  onPlay: null,
-                  onShuffle: null,
+                const SizedBox(height: 18),
+                songsAsync.when(
+                  data: (songs) => _SongsSummary(
+                    sort: _sort,
+                    count: songs.length,
+                    onPlay: songs.isEmpty ? null : () => _playSongs(ref, songs),
+                    onShuffle:
+                        songs.isEmpty ? null : () => _shuffleSongs(ref, songs),
+                  ),
+                  loading: () => _SongsSummary(
+                    sort: _sort,
+                    count: 0,
+                    loading: true,
+                    onPlay: null,
+                    onShuffle: null,
+                  ),
+                  error: (_, __) => _SongsSummary(
+                    sort: _sort,
+                    count: 0,
+                    onPlay: null,
+                    onShuffle: null,
+                  ),
                 ),
-                error: (_, __) => _SongsSummary(
-                  sort: _sort,
-                  count: 0,
-                  onPlay: null,
-                  onShuffle: null,
-                ),
-              ),
-              const SizedBox(height: 22),
-            ]),
+                const SizedBox(height: 22),
+              ]),
+            ),
           ),
-        ),
-        songsAsync.when(
-          data: (songs) {
-            if (songs.isEmpty) {
-              return const SliverFillRemaining(
-                hasScrollBody: false,
-                child: _SongsEmpty(),
-              );
-            }
+          songsAsync.when(
+            data: (songs) {
+              if (songs.isEmpty) {
+                return const SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: _SongsEmpty(),
+                );
+              }
 
-            return SliverPadding(
-              padding: const EdgeInsets.fromLTRB(4, 0, 4, 36),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final song = songs[index];
-                    final imageUrl = _songCoverUrl(ref, song);
-                    return ListenerTrackRow(
-                      song: song,
-                      imageUrl: imageUrl,
-                      onPress: () => _playSongs(
-                        ref,
-                        songs,
-                        initialIndex: index,
-                      ),
-                      onFavorite: () =>
-                          showChansonToast(context, '收藏功能将在喜爱页统一管理'),
-                      onMore: () => showListenerTrackActionSheet(
-                        context: context,
-                        ref: ref,
+              return SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 36),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final song = songs[index];
+                      final imageUrl = _songCoverUrl(ref, song);
+                      return ListenerTrackRow(
                         song: song,
                         imageUrl: imageUrl,
-                        queue: songs,
-                        index: index,
-                      ),
-                    );
-                  },
-                  childCount: songs.length,
+                        onPress: () => _playSongs(
+                          ref,
+                          songs,
+                          initialIndex: index,
+                        ),
+                        onFavorite: () =>
+                            showChansonToast(context, '收藏功能将在喜爱页统一管理'),
+                        onMore: () => showListenerTrackActionSheet(
+                          context: context,
+                          ref: ref,
+                          song: song,
+                          imageUrl: imageUrl,
+                          queue: songs,
+                          index: index,
+                        ),
+                      );
+                    },
+                    childCount: songs.length,
+                  ),
                 ),
-              ),
-            );
-          },
-          loading: () => const SliverFillRemaining(
-            hasScrollBody: false,
-            child: Center(child: FCircularProgress()),
-          ),
-          error: (_, __) => SliverFillRemaining(
-            hasScrollBody: false,
-            child: Center(
-              child: FButton(
-                variant: FButtonVariant.ghost,
-                onPress: () => ref.invalidate(songsLibraryProvider(_sort)),
-                child: const Text('重新加载歌曲'),
+              );
+            },
+            loading: () => const SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(child: FCircularProgress()),
+            ),
+            error: (_, __) => SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: FButton(
+                  variant: FButtonVariant.ghost,
+                  onPress: () => ref.invalidate(songsLibraryProvider(_sort)),
+                  child: const Text('重新加载歌曲'),
+                ),
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

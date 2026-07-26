@@ -235,6 +235,14 @@ class _SearchHero extends StatelessWidget {
           child: FTextField(
             autofocus: true,
             hint: '搜索艺术家、专辑或歌曲...',
+            style: FTextFieldStyleDelta.delta(
+              color: FVariantsValueDelta.delta([
+                FVariantValueDeltaOperation.all(Colors.transparent),
+              ]),
+              border: FVariantsValueDelta.delta([
+                FVariantValueDeltaOperation.all(InputBorder.none),
+              ]),
+            ),
             control: FTextFieldControl.managed(
               controller: controller,
               onChange: (value) => onChanged(value.text),

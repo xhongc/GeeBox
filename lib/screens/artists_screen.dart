@@ -28,11 +28,10 @@ class _ArtistsScreenState extends ConsumerState<ArtistsScreen> {
         : _filteredArtists(artistsAsync.valueOrNull!);
 
     return ListenerPageBackground(
-      dramatic: true,
       child: CustomScrollView(
         slivers: [
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(4, 10, 4, 32),
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 32),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
                 _ArtistsHero(

@@ -12,7 +12,12 @@ import '../widgets/listener_components.dart';
 
 /// Listener 风格专辑列表页面
 class AlbumsScreen extends ConsumerStatefulWidget {
-  const AlbumsScreen({super.key});
+  final bool embedded;
+
+  const AlbumsScreen({
+    super.key,
+    this.embedded = false,
+  });
 
   @override
   ConsumerState<AlbumsScreen> createState() => _AlbumsScreenState();
@@ -24,13 +29,14 @@ class _AlbumsScreenState extends ConsumerState<AlbumsScreen> {
   @override
   Widget build(BuildContext context) {
     final albumsAsync = ref.watch(albumListProvider(_sortType));
+    final horizontalPadding = widget.embedded ? 4.0 : 16.0;
 
     return ListenerPageBackground(
-      dramatic: true,
       child: CustomScrollView(
         slivers: [
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(4, 10, 4, 32),
+            padding: EdgeInsets.fromLTRB(
+                horizontalPadding, 10, horizontalPadding, 32),
             sliver: SliverList(
               delegate: SliverChildListDelegate.fixed([
                 _AlbumsHeading(
@@ -86,7 +92,8 @@ class _AlbumsScreenState extends ConsumerState<AlbumsScreen> {
               }
 
               return SliverPadding(
-                padding: const EdgeInsets.fromLTRB(4, 0, 4, 32),
+                padding: EdgeInsets.fromLTRB(
+                    horizontalPadding, 0, horizontalPadding, 32),
                 sliver: SliverGrid(
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,

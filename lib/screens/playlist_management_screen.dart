@@ -29,8 +29,7 @@ class _PlaylistManagementScreenState
 
     return FScaffold(
       childPad: false,
-      child: DecoratedBox(
-        decoration: const BoxDecoration(gradient: ListenerGradients.shell),
+      child: ListenerPageBackground(
         child: SafeArea(
           bottom: false,
           child: CustomScrollView(
