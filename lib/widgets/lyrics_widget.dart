@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:forui/forui.dart';
 import '../providers/lyrics_provider.dart';
+import '../providers/audio_player_provider.dart';
 import 'listener_components.dart';
 
 /// 歌词显示组件
@@ -325,12 +326,19 @@ class _LyricsWidgetState extends ConsumerState<LyricsWidget> {
                         Expanded(
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(28),
-                            child: LyricsWidget(
-                              artist: widget.artist,
-                              title: widget.title,
-                              position: widget.position,
-                              onSeek: widget.onSeek,
-                              expanded: true,
+                            child: Consumer(
+                              builder: (context, ref, _) {
+                                final currentPosition =
+                                    ref.watch(positionProvider).value ??
+                                        widget.position;
+                                return LyricsWidget(
+                                  artist: widget.artist,
+                                  title: widget.title,
+                                  position: currentPosition,
+                                  onSeek: widget.onSeek,
+                                  expanded: true,
+                                );
+                              },
                             ),
                           ),
                         ),
