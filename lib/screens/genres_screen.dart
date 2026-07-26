@@ -418,28 +418,28 @@ class _GenreArt extends StatelessWidget {
   Widget build(BuildContext context) {
     final seed = name.codeUnits.fold<int>(0, (sum, value) => sum + value);
     final palettes = [
-      [const Color(0xFFDBEAFE), const Color(0xFFF8FAFC)],
-      [const Color(0xFFFCE7F3), const Color(0xFFE0F2FE)],
-      [const Color(0xFFDCFCE7), const Color(0xFFFFF7ED)],
-      [const Color(0xFFEDE9FE), const Color(0xFFF8FAFC)],
+      const Color(0xFFEFF6FF),
+      const Color(0xFFF8FAFC),
+      const Color(0xFFF1F5F9),
+      const Color(0xFFFDF2F8),
     ];
-    final colors = palettes[seed % palettes.length];
+    final color = palettes[seed % palettes.length];
 
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: colors,
-        ),
-        borderRadius: BorderRadius.circular(22),
-      ),
+    return Center(
       child: Center(
-        child: Icon(
-          FLucideIcons.audioLines,
-          color: ListenerColors.foreground.withValues(alpha: 0.58),
-          size: 42,
+        child: Container(
+          width: 92,
+          height: 92,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.92),
+            shape: BoxShape.circle,
+            boxShadow: ListenerShadows.soft,
+          ),
+          child: Icon(
+            FLucideIcons.audioLines,
+            color: ListenerColors.foreground.withValues(alpha: 0.58),
+            size: 38,
+          ),
         ),
       ),
     );

@@ -25,111 +25,115 @@ class _AlbumsScreenState extends ConsumerState<AlbumsScreen> {
   Widget build(BuildContext context) {
     final albumsAsync = ref.watch(albumListProvider(_sortType));
 
-    return CustomScrollView(
-      slivers: [
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(4, 10, 4, 32),
-          sliver: SliverList(
-            delegate: SliverChildListDelegate.fixed([
-              _AlbumsHeading(
-                selected: _sortType,
-                onRefresh: () => ref.invalidate(albumListProvider(_sortType)),
-                onChanged: (value) {
-                  setState(() {
-                    _sortType = value;
-                  });
-                },
-              ),
-              const SizedBox(height: 18),
-              albumsAsync.when(
-                data: (albums) => _AlbumsSummary(
-                  sort: _sortType,
-                  count: albums.length,
-                  onPlayFirst: albums.isEmpty
-                      ? null
-                      : () => _playAlbum(ref, albums.first),
-                  onPlayRandom: albums.isEmpty
-                      ? null
-                      : () {
-                          final shuffled = List<Album>.from(albums)..shuffle();
-                          _playAlbum(ref, shuffled.first);
-                        },
-                ),
-                loading: () => _AlbumsSummary(
-                  sort: _sortType,
-                  count: 0,
-                  loading: true,
-                  onPlayFirst: null,
-                  onPlayRandom: null,
-                ),
-                error: (_, __) => _AlbumsSummary(
-                  sort: _sortType,
-                  count: 0,
-                  onPlayFirst: null,
-                  onPlayRandom: null,
-                ),
-              ),
-              const SizedBox(height: 24),
-            ]),
-          ),
-        ),
-        albumsAsync.when(
-          data: (albums) {
-            if (albums.isEmpty) {
-              return const SliverFillRemaining(
-                hasScrollBody: false,
-                child: _AlbumsEmpty(),
-              );
-            }
-
-            return SliverPadding(
-              padding: const EdgeInsets.fromLTRB(4, 0, 4, 32),
-              sliver: SliverGrid(
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  mainAxisSpacing: 18,
-                  crossAxisSpacing: 16,
-                  childAspectRatio: 0.72,
-                ),
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final album = albums[index];
-                    return ListenerAlbumCard(
-                      album: album,
-                      imageUrl: album.coverArt == null
-                          ? null
-                          : ref
-                              .read(musicRepositoryProvider)
-                              .getCoverArtUrl(album.coverArt!),
-                      onPress: () => context.push('/album-detail', extra: {
-                        'albumId': album.id,
-                        'albumName': album.name,
-                        'albumArtist': album.artist,
-                        'coverArtId': album.coverArt,
-                      }),
-                    );
+    return ListenerPageBackground(
+      dramatic: true,
+      child: CustomScrollView(
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(4, 10, 4, 32),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate.fixed([
+                _AlbumsHeading(
+                  selected: _sortType,
+                  onRefresh: () => ref.invalidate(albumListProvider(_sortType)),
+                  onChanged: (value) {
+                    setState(() {
+                      _sortType = value;
+                    });
                   },
-                  childCount: albums.length,
                 ),
-              ),
-            );
-          },
-          loading: () => const SliverFillRemaining(
-            hasScrollBody: false,
-            child: Center(child: FCircularProgress()),
+                const SizedBox(height: 18),
+                albumsAsync.when(
+                  data: (albums) => _AlbumsSummary(
+                    sort: _sortType,
+                    count: albums.length,
+                    onPlayFirst: albums.isEmpty
+                        ? null
+                        : () => _playAlbum(ref, albums.first),
+                    onPlayRandom: albums.isEmpty
+                        ? null
+                        : () {
+                            final shuffled = List<Album>.from(albums)
+                              ..shuffle();
+                            _playAlbum(ref, shuffled.first);
+                          },
+                  ),
+                  loading: () => _AlbumsSummary(
+                    sort: _sortType,
+                    count: 0,
+                    loading: true,
+                    onPlayFirst: null,
+                    onPlayRandom: null,
+                  ),
+                  error: (_, __) => _AlbumsSummary(
+                    sort: _sortType,
+                    count: 0,
+                    onPlayFirst: null,
+                    onPlayRandom: null,
+                  ),
+                ),
+                const SizedBox(height: 24),
+              ]),
+            ),
           ),
-          error: (_, __) => SliverFillRemaining(
-            hasScrollBody: false,
-            child: Center(
-              child: FButton(
-                variant: FButtonVariant.ghost,
-                onPress: () => ref.invalidate(albumListProvider(_sortType)),
-                child: const Text('重新加载专辑'),
+          albumsAsync.when(
+            data: (albums) {
+              if (albums.isEmpty) {
+                return const SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: _AlbumsEmpty(),
+                );
+              }
+
+              return SliverPadding(
+                padding: const EdgeInsets.fromLTRB(4, 0, 4, 32),
+                sliver: SliverGrid(
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 18,
+                    crossAxisSpacing: 16,
+                    childAspectRatio: 0.72,
+                  ),
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final album = albums[index];
+                      return ListenerAlbumCard(
+                        album: album,
+                        imageUrl: album.coverArt == null
+                            ? null
+                            : ref
+                                .read(musicRepositoryProvider)
+                                .getCoverArtUrl(album.coverArt!),
+                        onPress: () => context.push('/album-detail', extra: {
+                          'albumId': album.id,
+                          'albumName': album.name,
+                          'albumArtist': album.artist,
+                          'coverArtId': album.coverArt,
+                        }),
+                      );
+                    },
+                    childCount: albums.length,
+                  ),
+                ),
+              );
+            },
+            loading: () => const SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(child: FCircularProgress()),
+            ),
+            error: (_, __) => SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: FButton(
+                  variant: FButtonVariant.ghost,
+                  onPress: () => ref.invalidate(albumListProvider(_sortType)),
+                  child: const Text('重新加载专辑'),
+                ),
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -303,17 +307,17 @@ class _AlbumsSummary extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.82),
+        gradient: ListenerGradients.darkPlayer,
         borderRadius: BorderRadius.circular(26),
-        boxShadow: ListenerShadows.soft,
+        boxShadow: ListenerShadows.elevated,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             '当前视图',
             style: TextStyle(
-              color: ListenerColors.muted,
+              color: Colors.white.withValues(alpha: 0.58),
               fontSize: 12,
               fontWeight: FontWeight.w800,
             ),
@@ -322,7 +326,7 @@ class _AlbumsSummary extends StatelessWidget {
           Text(
             loading ? '正在加载...' : _pageTitle(sort),
             style: const TextStyle(
-              color: ListenerColors.foreground,
+              color: Colors.white,
               fontSize: 24,
               fontWeight: FontWeight.w800,
             ),
@@ -331,7 +335,7 @@ class _AlbumsSummary extends StatelessWidget {
           Text(
             loading ? '正在整理你的专辑收藏。' : _summaryText(sort, count),
             style: const TextStyle(
-              color: ListenerColors.softText,
+              color: Color(0xFFCBD5E1),
               fontSize: 13,
               height: 1.35,
             ),

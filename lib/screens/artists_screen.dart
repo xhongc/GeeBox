@@ -27,75 +27,82 @@ class _ArtistsScreenState extends ConsumerState<ArtistsScreen> {
         ? const <Artist>[]
         : _filteredArtists(artistsAsync.valueOrNull!);
 
-    return CustomScrollView(
-      slivers: [
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(4, 10, 4, 32),
-          sliver: SliverList(
-            delegate: SliverChildListDelegate([
-              _ArtistsHero(
-                sortValue: _sortValue,
-                onSort: (value) => setState(() => _sortValue = value),
-                onRefresh: () => ref.invalidate(artistsProvider),
-                count: filteredSnapshot.length,
-                onPlayFirst: filteredSnapshot.isEmpty
-                    ? null
-                    : () => _playArtist(ref, filteredSnapshot.first),
-                onPlayRandom: filteredSnapshot.isEmpty
-                    ? null
-                    : () {
-                        final shuffled = List<Artist>.from(filteredSnapshot)
-                          ..shuffle();
-                        _playArtist(ref, shuffled.first);
-                      },
-              ),
-              const SizedBox(height: 18),
-              artistsAsync.when(
-                data: (artists) {
-                  final filtered = _filteredArtists(artists);
-                  if (filtered.isEmpty) {
-                    return const _ArtistsEmpty();
-                  }
-
-                  return Column(
-                    children: [
-                      for (final artist in filtered)
-                        _ArtistRow(
-                          artist: artist,
-                          imageUrl: artist.coverArt == null
-                              ? null
-                              : ref
-                                  .read(musicRepositoryProvider)
-                                  .getCoverArtUrl(artist.coverArt!, size: 180),
-                          onOpen: () => context.push('/artist-detail', extra: {
-                            'artistId': artist.id,
-                            'artistName': artist.name,
-                            'coverArtId': artist.coverArt,
-                          }),
-                          onPlay: () => _playArtist(ref, artist),
-                        ),
-                    ],
-                  );
-                },
-                loading: () => const SizedBox(
-                  height: 260,
-                  child: Center(child: FCircularProgress()),
+    return ListenerPageBackground(
+      dramatic: true,
+      child: CustomScrollView(
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(4, 10, 4, 32),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                _ArtistsHero(
+                  sortValue: _sortValue,
+                  onSort: (value) => setState(() => _sortValue = value),
+                  onRefresh: () => ref.invalidate(artistsProvider),
+                  count: filteredSnapshot.length,
+                  onPlayFirst: filteredSnapshot.isEmpty
+                      ? null
+                      : () => _playArtist(ref, filteredSnapshot.first),
+                  onPlayRandom: filteredSnapshot.isEmpty
+                      ? null
+                      : () {
+                          final shuffled = List<Artist>.from(filteredSnapshot)
+                            ..shuffle();
+                          _playArtist(ref, shuffled.first);
+                        },
                 ),
-                error: (_, __) => SizedBox(
-                  height: 260,
-                  child: Center(
-                    child: FButton(
-                      variant: FButtonVariant.ghost,
-                      onPress: () => ref.invalidate(artistsProvider),
-                      child: const Text('重新加载艺术家'),
+                const SizedBox(height: 18),
+                artistsAsync.when(
+                  data: (artists) {
+                    final filtered = _filteredArtists(artists);
+                    if (filtered.isEmpty) {
+                      return const _ArtistsEmpty();
+                    }
+
+                    return Column(
+                      children: [
+                        for (final artist in filtered)
+                          _ArtistRow(
+                            artist: artist,
+                            imageUrl: artist.coverArt == null
+                                ? null
+                                : ref
+                                    .read(musicRepositoryProvider)
+                                    .getCoverArtUrl(
+                                      artist.coverArt!,
+                                      size: 180,
+                                    ),
+                            onOpen: () =>
+                                context.push('/artist-detail', extra: {
+                              'artistId': artist.id,
+                              'artistName': artist.name,
+                              'coverArtId': artist.coverArt,
+                            }),
+                            onPlay: () => _playArtist(ref, artist),
+                          ),
+                      ],
+                    );
+                  },
+                  loading: () => const SizedBox(
+                    height: 260,
+                    child: Center(child: FCircularProgress()),
+                  ),
+                  error: (_, __) => SizedBox(
+                    height: 260,
+                    child: Center(
+                      child: FButton(
+                        variant: FButtonVariant.ghost,
+                        onPress: () => ref.invalidate(artistsProvider),
+                        child: const Text('重新加载艺术家'),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ]),
+              ]),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 

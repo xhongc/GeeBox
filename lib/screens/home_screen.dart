@@ -557,7 +557,7 @@ class _ArtistGrid extends StatelessWidget {
         crossAxisCount: 3,
         crossAxisSpacing: 14,
         mainAxisSpacing: 14,
-        childAspectRatio: 0.94,
+        childAspectRatio: 0.82,
       ),
       itemBuilder: (context, index) {
         final artist = artists[index];

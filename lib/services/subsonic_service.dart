@@ -15,6 +15,7 @@ class SubsonicService {
   String _username = '';
   String _password = '';
   bool _isConfigured = false;
+  final Map<String, String> _coverArtUrlCache = {};
   static const String _clientName = 'Chanson';
   static const String _apiVersion = '1.16.1';
 
@@ -35,6 +36,7 @@ class SubsonicService {
     _username = username;
     _password = password;
     _isConfigured = true;
+    _coverArtUrlCache.clear();
   }
 
   bool get isConfigured => _isConfigured;
@@ -275,6 +277,10 @@ class SubsonicService {
   /// 获取封面图片 URL
   String getCoverArtUrl(String coverArtId, {int size = 300}) {
     if (!_isConfigured) return '';
+    final cacheKey = '$coverArtId:$size';
+    final cached = _coverArtUrlCache[cacheKey];
+    if (cached != null) return cached;
+
     final params = _getAuthParams();
     params['id'] = coverArtId;
     params['size'] = size.toString();
@@ -283,7 +289,9 @@ class SubsonicService {
         .map((e) => '${e.key}=${Uri.encodeComponent(e.value.toString())}')
         .join('&');
 
-    return '$_serverUrl/rest/getCoverArt?$queryString';
+    final url = '$_serverUrl/rest/getCoverArt?$queryString';
+    _coverArtUrlCache[cacheKey] = url;
+    return url;
   }
 
   /// 搜索

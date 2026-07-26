@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:forui/forui.dart';
 
@@ -51,6 +53,80 @@ class ListenerShadows {
       offset: const Offset(0, 16),
     ),
   ];
+}
+
+class ListenerPageBackground extends StatelessWidget {
+  final Widget child;
+  final bool dramatic;
+
+  const ListenerPageBackground({
+    super.key,
+    required this.child,
+    this.dramatic = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: const BoxDecoration(gradient: ListenerGradients.shell),
+      child: Stack(
+        children: [
+          Positioned(
+            top: dramatic ? -120 : -112,
+            right: dramatic ? -96 : -80,
+            child: _ListenerBlurredGlow(
+              color:
+                  dramatic ? const Color(0x3B111827) : const Color(0x2E3B82F6),
+              size: dramatic ? 250 : 224,
+              radius: dramatic ? 72 : 48,
+              blur: dramatic ? 34 : 24,
+            ),
+          ),
+          Positioned(
+            left: dramatic ? -92 : -80,
+            bottom: dramatic ? 120 : 80,
+            child: _ListenerBlurredGlow(
+              color:
+                  dramatic ? const Color(0x3AE11D48) : const Color(0x24F472B6),
+              size: dramatic ? 230 : 208,
+              radius: 999,
+              blur: dramatic ? 42 : 24,
+            ),
+          ),
+          Positioned.fill(child: child),
+        ],
+      ),
+    );
+  }
+}
+
+class _ListenerBlurredGlow extends StatelessWidget {
+  final Color color;
+  final double size;
+  final double radius;
+  final double blur;
+
+  const _ListenerBlurredGlow({
+    required this.color,
+    required this.size,
+    required this.radius,
+    required this.blur,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ImageFiltered(
+      imageFilter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(radius),
+        ),
+      ),
+    );
+  }
 }
 
 class ListenerCircleButton extends StatelessWidget {
@@ -107,6 +183,9 @@ class ListenerCoverArt extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final imageProvider =
+        imageUrl == null || imageUrl!.isEmpty ? null : NetworkImage(imageUrl!);
+
     Widget fallback() => DecoratedBox(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
@@ -122,10 +201,11 @@ class ListenerCoverArt extends StatelessWidget {
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(borderRadius),
-      child: imageUrl == null || imageUrl!.isEmpty
+      child: imageProvider == null
           ? fallback()
-          : Image.network(
-              imageUrl!,
+          : Image(
+              key: ValueKey(imageUrl),
+              image: imageProvider,
               fit: BoxFit.cover,
               errorBuilder: (context, error, stackTrace) => fallback(),
             ),
@@ -461,39 +541,51 @@ class ListenerTrackRow extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 10),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    formatSongDuration(song.duration),
-                    style: const TextStyle(
-                      color: ListenerColors.muted,
-                      fontSize: 12,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  FButton.icon(
-                    variant: FButtonVariant.ghost,
-                    size: FButtonSizeVariant.sm,
-                    onPress: onFavorite,
-                    child: const Icon(
-                      FLucideIcons.heart,
-                      color: Color(0xFFCBD5E1),
-                      size: 19,
-                    ),
-                  ),
-                  if (onMore != null)
-                    FButton.icon(
-                      variant: FButtonVariant.ghost,
-                      size: FButtonSizeVariant.sm,
-                      onPress: onMore,
-                      child: const Icon(
-                        FLucideIcons.ellipsis,
+              SizedBox(
+                width: onMore == null ? 46 : 86,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      formatSongDuration(song.duration),
+                      style: const TextStyle(
                         color: ListenerColors.muted,
-                        size: 19,
+                        fontSize: 12,
                       ),
                     ),
-                ],
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        FButton.icon(
+                          variant: FButtonVariant.ghost,
+                          size: FButtonSizeVariant.sm,
+                          onPress: onFavorite,
+                          child: const Icon(
+                            FLucideIcons.heart,
+                            color: Color(0xFFCBD5E1),
+                            size: 19,
+                          ),
+                        ),
+                        if (onMore != null) ...[
+                          const SizedBox(width: 2),
+                          FButton.icon(
+                            variant: FButtonVariant.ghost,
+                            size: FButtonSizeVariant.sm,
+                            onPress: onMore,
+                            child: const Icon(
+                              FLucideIcons.ellipsis,
+                              color: ListenerColors.muted,
+                              size: 19,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ],
           ),

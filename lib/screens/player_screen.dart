@@ -139,7 +139,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                       ),
                       const SizedBox(height: 22),
                       if (_showLyrics)
-                        _LyricsStage(song: currentSong)
+                        _LyricsStage(
+                          song: currentSong,
+                          position: currentPosition,
+                        )
                       else
                         _CoverStage(
                           coverUrl: coverUrl,
@@ -344,19 +347,24 @@ class _CoverStage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    final coverSize = width.clamp(0, 420) * 0.66;
+    final resolvedCoverSize = coverSize.clamp(216.0, 252.0);
+    final discSize = resolvedCoverSize * 0.94;
+
     return SizedBox(
       height: 300,
       child: Stack(
         alignment: Alignment.center,
         children: [
-          Positioned(
-            right: 36,
+          Transform.translate(
+            offset: Offset(resolvedCoverSize * 0.24, 0),
             child: AnimatedRotation(
               turns: isPlaying ? 1 : 0,
               duration: const Duration(seconds: 12),
               child: Container(
-                width: 224,
-                height: 224,
+                width: discSize,
+                height: discSize,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: ListenerColors.foreground,
@@ -375,11 +383,11 @@ class _CoverStage extends StatelessWidget {
               ),
             ),
           ),
-          Positioned(
-            left: 20,
+          Align(
+            alignment: Alignment.center,
             child: Container(
-              width: 230,
-              height: 230,
+              width: resolvedCoverSize,
+              height: resolvedCoverSize,
               decoration: BoxDecoration(boxShadow: ListenerShadows.elevated),
               child: ListenerCoverArt(
                 imageUrl: coverUrl,
@@ -396,8 +404,12 @@ class _CoverStage extends StatelessWidget {
 
 class _LyricsStage extends StatelessWidget {
   final Song song;
+  final Duration position;
 
-  const _LyricsStage({required this.song});
+  const _LyricsStage({
+    required this.song,
+    required this.position,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -408,7 +420,11 @@ class _LyricsStage extends StatelessWidget {
         borderRadius: BorderRadius.circular(28),
         boxShadow: ListenerShadows.soft,
       ),
-      child: LyricsWidget(artist: song.artist, title: song.title),
+      child: LyricsWidget(
+        artist: song.artist,
+        title: song.title,
+        position: position,
+      ),
     );
   }
 }

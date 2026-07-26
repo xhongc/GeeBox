@@ -39,28 +39,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   Widget build(BuildContext context) {
     return FScaffold(
       childPad: false,
-      child: DecoratedBox(
-        decoration: const BoxDecoration(gradient: ListenerGradients.shell),
+      child: ListenerPageBackground(
         child: Stack(
           children: [
-            const Positioned(
-              top: -112,
-              right: -80,
-              child: _ListenerGlow(
-                color: Color(0x2E3B82F6),
-                size: 224,
-                radius: 48,
-              ),
-            ),
-            const Positioned(
-              left: -80,
-              bottom: 80,
-              child: _ListenerGlow(
-                color: Color(0x24F472B6),
-                size: 208,
-                radius: 999,
-              ),
-            ),
             Positioned.fill(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(12, 12, 12, 184),
@@ -86,37 +67,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _ListenerGlow extends StatelessWidget {
-  final Color color;
-  final double size;
-  final double radius;
-
-  const _ListenerGlow({
-    required this.color,
-    required this.size,
-    required this.radius,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(radius),
-        boxShadow: [
-          BoxShadow(
-            color: color,
-            blurRadius: 20,
-            spreadRadius: 12,
-          ),
-        ],
       ),
     );
   }
