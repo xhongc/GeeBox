@@ -7,6 +7,7 @@ import '../models/song.dart';
 import '../providers/audio_player_provider.dart';
 import '../providers/favorite_provider.dart';
 import '../providers/music_repository_provider.dart';
+import '../providers/navigation_provider.dart';
 import '../providers/play_history_provider.dart';
 import '../providers/subsonic_provider.dart';
 import '../services/audio_player_service.dart';
@@ -104,19 +105,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         decoration: const BoxDecoration(gradient: ListenerGradients.shell),
         child: Stack(
           children: [
-            Positioned(
-              top: -80,
-              left: -48,
-              right: -48,
-              height: 300,
-              child: Opacity(
-                opacity: 0.18,
-                child: ListenerCoverArt(
-                  imageUrl: coverUrl,
-                  fallbackIcon: FLucideIcons.music,
-                  borderRadius: 0,
-                ),
-              ),
+            ListenerCoverBackdrop(
+              imageUrl: coverUrl,
+              fallbackIcon: FLucideIcons.music,
             ),
             Positioned.fill(
               child: SafeArea(
@@ -142,6 +133,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                         _LyricsStage(
                           song: currentSong,
                           position: currentPosition,
+                          onSeek: audioService.seek,
                         )
                       else
                         _CoverStage(
@@ -183,7 +175,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                         onNext: () => audioService.next(
                           (id) => subsonicService.getStreamUrl(id),
                         ),
-                        onQueue: () => context.push('/play-queue'),
+                        onQueue: () => _openQueueTab(context),
                       ),
                     ],
                   ),
@@ -194,6 +186,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         ),
       ),
     );
+  }
+
+  void _openQueueTab(BuildContext context) {
+    ref.read(mainNavigationIndexProvider.notifier).state = 2;
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+      return;
+    }
+    context.go('/');
   }
 
   Future<void> _toggleFavorite(BuildContext context, Song song) async {
@@ -348,9 +349,10 @@ class _CoverStage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
-    final coverSize = width.clamp(0, 420) * 0.66;
-    final resolvedCoverSize = coverSize.clamp(216.0, 252.0);
-    final discSize = resolvedCoverSize * 0.78;
+    final height = MediaQuery.sizeOf(context).height;
+    final coverSize = (width * 0.74).clamp(236.0, height * 0.34);
+    final resolvedCoverSize = coverSize.clamp(236.0, 288.0);
+    final discSize = resolvedCoverSize * 0.72;
 
     return SizedBox(
       height: 300,
@@ -372,8 +374,8 @@ class _CoverStage extends StatelessWidget {
                 ),
                 child: Center(
                   child: Container(
-                    width: 68,
-                    height: 68,
+                    width: discSize * 0.30,
+                    height: discSize * 0.30,
                     decoration: const BoxDecoration(
                       shape: BoxShape.circle,
                       color: Color(0xFFF7F6F3),
@@ -404,25 +406,32 @@ class _CoverStage extends StatelessWidget {
 class _LyricsStage extends StatelessWidget {
   final Song song;
   final Duration position;
+  final ValueChanged<Duration> onSeek;
 
   const _LyricsStage({
     required this.song,
     required this.position,
+    required this.onSeek,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return SizedBox(
       height: 300,
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.72),
+      child: ClipRRect(
         borderRadius: BorderRadius.circular(28),
-        boxShadow: ListenerShadows.soft,
-      ),
-      child: LyricsWidget(
-        artist: song.artist,
-        title: song.title,
-        position: position,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(28),
+          ),
+          child: LyricsWidget(
+            artist: song.artist,
+            title: song.title,
+            position: position,
+            onSeek: onSeek,
+          ),
+        ),
       ),
     );
   }

@@ -43,19 +43,9 @@ class AlbumDetailScreen extends ConsumerWidget {
         decoration: const BoxDecoration(gradient: ListenerGradients.shell),
         child: Stack(
           children: [
-            Positioned(
-              top: -56,
-              left: -32,
-              right: -32,
-              height: 260,
-              child: Opacity(
-                opacity: 0.18,
-                child: ListenerCoverArt(
-                  imageUrl: coverUrl,
-                  fallbackIcon: FLucideIcons.disc3,
-                  borderRadius: 0,
-                ),
-              ),
+            ListenerCoverBackdrop(
+              imageUrl: coverUrl,
+              fallbackIcon: FLucideIcons.disc3,
             ),
             Positioned.fill(
               child: SafeArea(
@@ -248,9 +238,10 @@ class _AlbumDetailHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
-    final coverSize = width.clamp(0, 420) * 0.66;
-    final resolvedCoverSize = coverSize.clamp(216.0, 252.0);
-    final discSize = resolvedCoverSize * 0.78;
+    final height = MediaQuery.sizeOf(context).height;
+    final coverSize = (width * 0.78).clamp(246.0, height * 0.34);
+    final resolvedCoverSize = coverSize.clamp(246.0, 304.0);
+    final discSize = resolvedCoverSize * 0.72;
 
     return Column(
       children: [
@@ -271,8 +262,8 @@ class _AlbumDetailHero extends StatelessWidget {
                   ),
                   child: Center(
                     child: Container(
-                      width: 56,
-                      height: 56,
+                      width: discSize * 0.30,
+                      height: discSize * 0.30,
                       decoration: const BoxDecoration(
                         shape: BoxShape.circle,
                         color: Color(0xFFF7F6F3),

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:forui/forui.dart';
+import '../providers/navigation_provider.dart';
 import 'home_screen.dart';
 import 'albums_screen.dart';
 import 'favorites_screen.dart';
@@ -9,16 +11,15 @@ import '../widgets/mini_player.dart';
 import '../widgets/listener_components.dart';
 
 /// 主导航页面 - 底部导航栏
-class MainNavigationScreen extends StatefulWidget {
+class MainNavigationScreen extends ConsumerStatefulWidget {
   const MainNavigationScreen({super.key});
 
   @override
-  State<MainNavigationScreen> createState() => _MainNavigationScreenState();
+  ConsumerState<MainNavigationScreen> createState() =>
+      _MainNavigationScreenState();
 }
 
-class _MainNavigationScreenState extends State<MainNavigationScreen> {
-  int _currentIndex = 0;
-
+class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
   final List<Widget> _screens = const [
     HomeScreen(),
     AlbumsScreen(embedded: true),
@@ -37,6 +38,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final currentIndex = ref.watch(mainNavigationIndexProvider);
+
     return FScaffold(
       childPad: false,
       child: ListenerPageBackground(
@@ -46,7 +49,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(12, 12, 12, 184),
                 child: IndexedStack(
-                  index: _currentIndex,
+                  index: currentIndex,
                   children: _screens,
                 ),
               ),
@@ -56,11 +59,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               right: 0,
               bottom: 0,
               child: _ListenerDock(
-                index: _currentIndex,
+                index: currentIndex,
                 onChange: (index) {
-                  setState(() {
-                    _currentIndex = index;
-                  });
+                  ref.read(mainNavigationIndexProvider.notifier).state = index;
                 },
                 onPlayerTap: _openPlayer,
               ),

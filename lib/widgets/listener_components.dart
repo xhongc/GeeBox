@@ -258,6 +258,65 @@ class ListenerPlayingArtCard extends StatelessWidget {
   }
 }
 
+class ListenerCoverBackdrop extends StatelessWidget {
+  final String? imageUrl;
+  final IconData fallbackIcon;
+
+  const ListenerCoverBackdrop({
+    super.key,
+    required this.imageUrl,
+    this.fallbackIcon = FLucideIcons.music,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        Positioned(
+          top: -82,
+          left: -56,
+          right: -56,
+          height: 340,
+          child: Opacity(
+            opacity: 0.18,
+            child: ImageFiltered(
+              imageFilter: ImageFilter.blur(sigmaX: 44, sigmaY: 44),
+              child: Transform.scale(
+                scale: 1.08,
+                child: ListenerCoverArt(
+                  imageUrl: imageUrl,
+                  fallbackIcon: fallbackIcon,
+                  borderRadius: 0,
+                ),
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          top: -96,
+          left: 0,
+          right: 0,
+          height: 260,
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: Alignment.topCenter,
+                  radius: 0.72,
+                  colors: [
+                    Colors.white.withValues(alpha: 0.88),
+                    Colors.white.withValues(alpha: 0.0),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class ListenerSectionHeader extends StatelessWidget {
   final String title;
   final String? actionLabel;
