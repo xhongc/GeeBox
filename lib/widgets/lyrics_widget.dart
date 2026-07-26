@@ -28,7 +28,6 @@ class LyricsWidget extends ConsumerStatefulWidget {
 
 class _LyricsWidgetState extends ConsumerState<LyricsWidget> {
   final ScrollController _scrollController = ScrollController();
-  List<GlobalKey> _lineKeys = [];
   int _lastActiveIndex = -1;
   bool _isUserScrolling = false;
   bool _isAutoScrolling = false;
@@ -112,7 +111,6 @@ class _LyricsWidgetState extends ConsumerState<LyricsWidget> {
           );
         }
 
-        _syncLineKeys(parsed.length);
         final activeIndex = _activeLyricIndex(parsed, widget.position);
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _scrollToActive(activeIndex);
@@ -131,7 +129,6 @@ class _LyricsWidgetState extends ConsumerState<LyricsWidget> {
             ),
             itemCount: parsed.length,
             itemBuilder: (context, index) {
-              final lineKey = _lineKeys[index];
               final isActive = index == activeIndex;
               final distance = (index - activeIndex).abs();
               final isAfterActive = index > activeIndex;
@@ -161,7 +158,6 @@ class _LyricsWidgetState extends ConsumerState<LyricsWidget> {
               };
 
               return SizedBox(
-                key: lineKey,
                 height: _lyricsLineHeight,
                 child: Center(
                   child: AnimatedOpacity(
@@ -240,28 +236,30 @@ class _LyricsWidgetState extends ConsumerState<LyricsWidget> {
     );
   }
 
-  void _syncLineKeys(int length) {
-    if (_lineKeys.length == length) return;
-    _lineKeys = List<GlobalKey>.generate(length, (_) => GlobalKey());
-  }
-
   void _scrollToActive(int activeIndex) {
     if (!_scrollController.hasClients || activeIndex < 0) return;
     if (_isUserScrolling) return;
     if (activeIndex == _lastActiveIndex) return;
-    if (activeIndex >= _lineKeys.length) return;
-    final targetContext = _lineKeys[activeIndex].currentContext;
-    if (targetContext == null) return;
     _lastActiveIndex = activeIndex;
     _isAutoScrolling = true;
     _releaseAutoScrollTimer?.cancel();
-    Scrollable.ensureVisible(
-      targetContext,
-      alignment: 0.5,
-      alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
+    final position = _scrollController.position;
+    final target =
+        _offsetForCenteredLyric(activeIndex, position.viewportDimension)
+            .clamp(position.minScrollExtent, position.maxScrollExtent);
+
+    if ((_scrollController.offset - target).abs() < 1) {
+      _isAutoScrolling = false;
+      return;
+    }
+
+    _scrollController
+        .animateTo(
+      target,
       duration: const Duration(milliseconds: 280),
       curve: Curves.easeOutCubic,
-    ).whenComplete(() {
+    )
+        .whenComplete(() {
       _releaseAutoScrollTimer?.cancel();
       _releaseAutoScrollTimer = Timer(const Duration(milliseconds: 80), () {
         _isAutoScrolling = false;
@@ -299,6 +297,13 @@ class _LyricsWidgetState extends ConsumerState<LyricsWidget> {
         (viewportCenter - _lyricsVerticalPadding - _lyricsLineHeight / 2) /
             _lyricsLineHeight;
     return rawIndex.round().clamp(0, lineCount - 1);
+  }
+
+  double _offsetForCenteredLyric(int index, double viewportDimension) {
+    return _lyricsVerticalPadding +
+        index * _lyricsLineHeight +
+        _lyricsLineHeight / 2 -
+        viewportDimension / 2;
   }
 }
 
