@@ -38,7 +38,9 @@ dependencies:
   dio: ^5.7.0
 
   # 音频播放
-  just_audio: ^0.9.42
+  just_audio: ^0.10.6
+  audio_service: ^0.18.19
+  audio_session: ^0.2.2
 
   # 加密（用于 Subsonic API 认证）
   crypto: ^3.0.6

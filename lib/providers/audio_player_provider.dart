@@ -2,10 +2,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 import '../services/audio_player_service.dart';
 import '../models/song.dart';
+import 'subsonic_provider.dart';
 
 // 音频播放器服务单例 Provider
 final audioPlayerServiceProvider = Provider<AudioPlayerService>((ref) {
-  return AudioPlayerService();
+  final service = AudioPlayerService();
+  final subsonic = ref.watch(subsonicServiceProvider);
+  service
+    ..bindStreamUrlBuilder(subsonic.getStreamUrl)
+    ..bindCoverArtUrlBuilder(subsonic.getCoverArtUrl);
+  return service;
 });
 
 // 当前播放歌曲 Provider - 从 AudioPlayerService 的 stream 获取

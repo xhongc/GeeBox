@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:flutter/foundation.dart';
 import '../models/song.dart';
@@ -72,12 +73,18 @@ class JustAudioPlaybackBackend implements AudioPlaybackBackend {
   Future<void> dispose() => _player.dispose();
 }
 
-class AudioPlayerService {
+class AudioPlayerService extends BaseAudioHandler
+    with QueueHandler, SeekHandler {
   static final AudioPlayerService _instance = AudioPlayerService._internal();
   factory AudioPlayerService() => _instance;
-  AudioPlayerService._internal() : _backend = JustAudioPlaybackBackend();
+  AudioPlayerService._internal() : _backend = JustAudioPlaybackBackend() {
+    _listenToPlayer();
+  }
   @visibleForTesting
-  AudioPlayerService.testing(AudioPlaybackBackend backend) : _backend = backend;
+  AudioPlayerService.testing(AudioPlaybackBackend backend)
+      : _backend = backend {
+    _listenToPlayer();
+  }
 
   final AudioPlaybackBackend _backend;
   List<Song> _playlist = [];
@@ -85,6 +92,7 @@ class AudioPlayerService {
   PlayMode _playMode = PlayMode.sequence;
   Song? _currentSong; // 独立维护当前歌曲
   String Function(String)? _streamUrlBuilder;
+  String Function(String, {int size})? _coverArtUrlBuilder;
   Duration _lastPosition = Duration.zero;
   String? _playbackError;
   final List<int> _shuffleHistory = [];
@@ -174,11 +182,64 @@ class AudioPlayerService {
 
   void bindStreamUrlBuilder(String Function(String) getStreamUrl) {
     _streamUrlBuilder = getStreamUrl;
-    _playerStateSubscription ??= _backend.playerStateStream.listen((state) {
+  }
+
+  void bindCoverArtUrlBuilder(
+    String Function(String, {int size}) getCoverArtUrl,
+  ) {
+    _coverArtUrlBuilder = getCoverArtUrl;
+  }
+
+  void _listenToPlayer() {
+    _playerStateSubscription = _backend.playerStateStream.listen((state) {
+      _broadcastPlaybackState(state);
       if (state.processingState == ProcessingState.completed) {
         _handlePlaybackCompleted();
       }
     });
+  }
+
+  void _broadcastPlaybackState(PlayerState state) {
+    playbackState.add(PlaybackState(
+      controls: [
+        MediaControl.skipToPrevious,
+        state.playing ? MediaControl.pause : MediaControl.play,
+        MediaControl.stop,
+        MediaControl.skipToNext,
+      ],
+      systemActions: const {MediaAction.seek},
+      androidCompactActionIndices: const [0, 1, 3],
+      processingState: switch (state.processingState) {
+        ProcessingState.idle => AudioProcessingState.idle,
+        ProcessingState.loading => AudioProcessingState.loading,
+        ProcessingState.buffering => AudioProcessingState.buffering,
+        ProcessingState.ready => AudioProcessingState.ready,
+        ProcessingState.completed => AudioProcessingState.completed,
+      },
+      playing: state.playing,
+      updatePosition: _lastPosition,
+      queueIndex: _currentIndex < 0 ? null : _currentIndex,
+    ));
+  }
+
+  MediaItem _toMediaItem(Song song) {
+    final coverArt = song.coverArt;
+    final coverUrl = coverArt == null
+        ? null
+        : _coverArtUrlBuilder?.call(coverArt, size: 700);
+    return MediaItem(
+      id: song.id,
+      title: song.title,
+      album: song.album,
+      artist: song.artist,
+      duration:
+          song.duration == null ? null : Duration(seconds: song.duration!),
+      artUri: coverUrl == null || coverUrl.isEmpty ? null : Uri.parse(coverUrl),
+    );
+  }
+
+  void _broadcastQueue() {
+    queue.add(_playlist.map(_toMediaItem).toList(growable: false));
   }
 
   Future<void> _handlePlaybackCompleted() async {
@@ -260,6 +321,7 @@ class AudioPlayerService {
     _shuffleHistoryIndex = -1;
     _playlistController.add(List.unmodifiable(_playlist));
     _currentIndexController.add(_currentIndex);
+    _broadcastQueue();
   }
 
   /// 播放指定歌曲
@@ -279,6 +341,7 @@ class AudioPlayerService {
 
     // 立即通知当前歌曲变化，确保 UI 能立即响应
     _currentSongController.add(song);
+    mediaItem.add(_toMediaItem(song));
 
     // 重置 scrobble 标记
     _hasScrobbled = false;
@@ -339,7 +402,13 @@ class AudioPlayerService {
     }
   }
 
+  @override
+  Future<void> play() async {
+    await _backend.play();
+  }
+
   /// 暂停播放
+  @override
   Future<void> pause() async {
     await _backend.pause();
   }
@@ -381,6 +450,24 @@ class AudioPlayerService {
     if (_currentIndex > 0) {
       await playAtIndex(_currentIndex - 1, getStreamUrl);
     }
+  }
+
+  @override
+  Future<void> skipToNext() async {
+    final getStreamUrl = _streamUrlBuilder;
+    if (getStreamUrl != null) await next(getStreamUrl);
+  }
+
+  @override
+  Future<void> skipToPrevious() async {
+    final getStreamUrl = _streamUrlBuilder;
+    if (getStreamUrl != null) await previous(getStreamUrl);
+  }
+
+  @override
+  Future<void> skipToQueueItem(int index) async {
+    final getStreamUrl = _streamUrlBuilder;
+    if (getStreamUrl != null) await playAtIndex(index, getStreamUrl);
   }
 
   Future<void> _playRandomNext(String Function(String) getStreamUrl) async {
@@ -476,15 +563,21 @@ class AudioPlayerService {
   }
 
   /// 跳转到指定位置
+  @override
   Future<void> seek(Duration position) async {
     await _backend.seek(position);
+    _lastPosition = position;
+    playbackState.add(playbackState.value.copyWith(updatePosition: position));
   }
 
   /// 停止播放
+  @override
   Future<void> stop() async {
     await _backend.stop();
     _currentSong = null;
     _currentSongController.add(null);
+    mediaItem.add(null);
+    await super.stop();
   }
 
   /// 释放资源
@@ -503,6 +596,7 @@ class AudioPlayerService {
   void addToQueue(Song song) {
     _playlist.add(song);
     _playlistController.add(List.unmodifiable(_playlist));
+    _broadcastQueue();
   }
 
   /// 添加歌曲到当前歌曲之后
@@ -512,12 +606,14 @@ class AudioPlayerService {
         : _playlist.length;
     _playlist.insert(insertIndex, song);
     _playlistController.add(List.unmodifiable(_playlist));
+    _broadcastQueue();
   }
 
   /// 添加多首歌曲到队列
   void addAllToQueue(List<Song> songs) {
     _playlist.addAll(songs);
     _playlistController.add(List.unmodifiable(_playlist));
+    _broadcastQueue();
   }
 
   /// 从队列中移除指定索引的歌曲
@@ -537,6 +633,7 @@ class AudioPlayerService {
     _playlist.removeAt(index);
     _playlistController.add(List.unmodifiable(_playlist));
     _currentIndexController.add(_currentIndex);
+    _broadcastQueue();
   }
 
   /// 清空播放队列
@@ -548,6 +645,7 @@ class AudioPlayerService {
     _currentSongController.add(null);
     _playlistController.add(List.unmodifiable(_playlist));
     _currentIndexController.add(_currentIndex);
+    _broadcastQueue();
   }
 
   /// 移动队列中的歌曲位置
@@ -569,5 +667,6 @@ class AudioPlayerService {
 
     _playlistController.add(List.unmodifiable(_playlist));
     _currentIndexController.add(_currentIndex);
+    _broadcastQueue();
   }
 }

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:audio_service/audio_service.dart';
 import 'package:chanson/main.dart';
 import 'package:chanson/models/album.dart';
 import 'package:chanson/models/artist.dart';
@@ -342,6 +343,37 @@ void main() {
     expect(service.currentIndex, 1);
     expect(service.currentSong, songs[1]);
     expect(backend.lastUrl, 'https://example.test/stream/song-2');
+
+    await service.dispose();
+  });
+
+  test('AudioPlayerService publishes system media controls', () async {
+    final backend = _FakeAudioPlaybackBackend();
+    final service = AudioPlayerService.testing(backend);
+    final songs = [
+      subsonicService._songs.first.copyWith(coverArt: 'cover-song-1'),
+      subsonicService._songs[1],
+    ];
+    service
+      ..bindStreamUrlBuilder((id) => 'https://example.test/stream/$id')
+      ..bindCoverArtUrlBuilder(
+        (id, {int size = 300}) => 'https://example.test/cover/$id/$size',
+      );
+
+    await service.setPlaylist(songs);
+    await service.playAtIndex(0, (id) => 'https://example.test/stream/$id');
+    await Future<void>.delayed(Duration.zero);
+
+    expect(service.queue.value.map((item) => item.id),
+        songs.map((song) => song.id));
+    expect(service.mediaItem.value?.title, songs.first.title);
+    expect(service.mediaItem.value?.artUri.toString(),
+        'https://example.test/cover/cover-song-1/700');
+    expect(service.playbackState.value.playing, isTrue);
+    expect(service.playbackState.value.controls, contains(MediaControl.pause));
+
+    await service.skipToNext();
+    expect(service.currentSong, songs[1]);
 
     await service.dispose();
   });

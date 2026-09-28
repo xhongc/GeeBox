@@ -1,3 +1,5 @@
+import 'package:audio_service/audio_service.dart';
+import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,6 +13,8 @@ import 'models/search_history.dart';
 import 'models/playlist.dart';
 import 'providers/theme_provider.dart';
 import 'providers/subsonic_provider.dart';
+import 'providers/audio_player_provider.dart';
+import 'services/audio_player_service.dart';
 import 'services/subsonic_service.dart';
 import 'theme/app_theme.dart';
 
@@ -48,10 +52,23 @@ void main() async {
     );
   }
 
+  final audioPlayerService = AudioPlayerService();
+  await AudioService.init(
+    builder: () => audioPlayerService,
+    config: const AudioServiceConfig(
+      androidNotificationChannelId: 'com.example.chanson.audio',
+      androidNotificationChannelName: '音乐播放',
+      androidStopForegroundOnPause: false,
+    ),
+  );
+  final audioSession = await AudioSession.instance;
+  await audioSession.configure(const AudioSessionConfiguration.music());
+
   runApp(
     ProviderScope(
       overrides: [
         subsonicServiceProvider.overrideWithValue(subsonicService),
+        audioPlayerServiceProvider.overrideWithValue(audioPlayerService),
       ],
       child: const MyApp(),
     ),
